@@ -1,0 +1,17 @@
+[package]
+name = "evalvana"
+version = "0.1.0"
+authors = ["ThatsNoMoon <ThatsNoMoon.Alderaan@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+winit = "0.20"
+wgpu = "0.4"
+env_logger = "0.7"
+cgmath = "0.17"
+zerocopy = "0.2"
+memoffset = "0.5"
+wgpu_glyph = "0.6"
+
+[build-dependencies]
+shaderc = "0.6"
