@@ -1,4 +1,4 @@
-use crate::color::Color;
+use crate::renderer::color::Color;
 
 pub struct Config {
     pub ui_colors: UiColors,
