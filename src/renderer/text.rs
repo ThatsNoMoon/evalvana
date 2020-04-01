@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 
 use wgpu_glyph::{
-    Section,
-    GlyphBrush,
-    GlyphBrushBuilder,
-    Scale as FontScale,
-    SectionText,
-    VariedSection,
+	Section,
+	GlyphBrush,
+	GlyphBrushBuilder,
+	Scale as FontScale,
+	SectionText,
+	VariedSection,
 };
 
 pub struct TextRenderer {
