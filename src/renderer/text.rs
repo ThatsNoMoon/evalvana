@@ -16,7 +16,9 @@ pub struct TextRenderer {
 impl TextRenderer {
 	pub fn new(device: &mut wgpu::Device, font: &'static [u8], texture_format: wgpu::TextureFormat) -> TextRenderer {
 		TextRenderer {
-			glyph_brush: GlyphBrushBuilder::using_font_bytes(font).build(device, texture_format),
+			glyph_brush: GlyphBrushBuilder::using_font_bytes(font)
+				.unwrap()
+				.build(device, texture_format),
 		}
 	}
 

@@ -5,13 +5,14 @@ authors = ["ThatsNoMoon <ThatsNoMoon.Alderaan@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-winit = "0.20"
+winit = "0.22"
 wgpu = "0.4"
 env_logger = "0.7"
+log = "0.4"
 cgmath = "0.17"
 zerocopy = "0.2"
 memoffset = "0.5"
-wgpu_glyph = "0.6"
+wgpu_glyph = "0.7"
 
 [build-dependencies]
 shaderc = "0.6"
