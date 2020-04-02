@@ -9,9 +9,21 @@ use winit::{
 	window::{Icon, Window, WindowBuilder},
 };
 
-const ICON: &'static [u8] = include_bytes!(concat!(
+const ICON16: &'static [u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
-	"/assets/icons/logo.png"
+	"/assets/icons/logo_16.png"
+));
+const ICON32: &'static [u8] = include_bytes!(concat!(
+	env!("CARGO_MANIFEST_DIR"),
+	"/assets/icons/logo_32.png"
+));
+const ICON64: &'static [u8] = include_bytes!(concat!(
+	env!("CARGO_MANIFEST_DIR"),
+	"/assets/icons/logo_64.png"
+));
+const ICON128: &'static [u8] = include_bytes!(concat!(
+	env!("CARGO_MANIFEST_DIR"),
+	"/assets/icons/logo_128.png"
 ));
 
 pub struct App {
@@ -49,16 +61,7 @@ impl App {
 
 		let window = WindowBuilder::new().build(&event_loop).unwrap();
 
-		{
-			let logo_decoder = PngDecoder::new(ICON).unwrap();
-			let (logo_w, logo_h) = logo_decoder.dimensions();
-			let mut logo_pixels = vec![0; logo_decoder.total_bytes() as usize];
-			logo_decoder.read_image(logo_pixels.as_mut_slice()).unwrap();
-
-			let icon = Icon::from_rgba(logo_pixels, logo_w, logo_h).unwrap();
-
-			window.set_window_icon(Some(icon));
-		}
+		App::set_scaled_icon(&window, 1.0);
 
 		window.set_title("Evalvana");
 
@@ -97,6 +100,16 @@ impl App {
 					renderer.resize(size);
 				}
 
+				Event::WindowEvent {
+					event: WindowEvent::ScaleFactorChanged {
+						scale_factor,
+						..
+					},
+					..
+				} => {
+					App::set_scaled_icon(&window, scale_factor);
+				}
+
 				Event::RedrawRequested(_) => {
 					renderer.redraw(&window, &config, &mut interface);
 				}
@@ -108,5 +121,38 @@ impl App {
 				_ => (),
 			}
 		});
+	}
+
+	fn set_scaled_icon(window: &Window, scale_factor: f64) {
+		fn icon_from_bytes(icon_bytes: &[u8]) -> Icon {
+			let logo_decoder = PngDecoder::new(icon_bytes).unwrap();
+			let (logo_w, logo_h) = logo_decoder.dimensions();
+			let mut logo_pixels = vec![0; logo_decoder.total_bytes() as usize];
+			logo_decoder.read_image(logo_pixels.as_mut_slice()).unwrap();
+
+			Icon::from_rgba(logo_pixels, logo_w, logo_h).unwrap()
+		}
+
+		let icon_bytes = match (scale_factor.ceil() as u8).checked_next_power_of_two().unwrap_or_else(|| panic!("Invalid scale factor {}", scale_factor)) {
+			1 => ICON16,
+			2 => ICON32,
+			4 => ICON64,
+			_ => ICON128,
+		};
+
+		window.set_window_icon(Some(icon_from_bytes(icon_bytes)));
+
+		#[cfg(target_os = "windows")]
+		{
+			use winit::platform::windows::WindowExtWindows;
+
+			let large_icon_bytes = match (scale_factor.ceil() as u8).checked_next_power_of_two().unwrap_or_else(|| panic!("Invalid scale factor {}", scale_factor)) {
+				1 => ICON32,
+				2 => ICON64,
+				_ => ICON128,
+			};
+
+			window.set_taskbar_icon(Some(icon_from_bytes(large_icon_bytes)));
+		}
 	}
 }
