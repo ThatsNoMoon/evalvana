@@ -9,10 +9,11 @@ winit = "0.22"
 wgpu = "0.4"
 env_logger = "0.7"
 log = "0.4"
-cgmath = "0.17"
 zerocopy = "0.2"
 memoffset = "0.5"
 wgpu_glyph = "0.7"
+crossbeam-channel = "0.4"
+image = "0.23"
 
 [build-dependencies]
 shaderc = "0.6"

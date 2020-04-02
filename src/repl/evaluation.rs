@@ -1,6 +1,6 @@
 use crate::input::commands::Command;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct EditedExpression {
 	input: String,
 	cursor: usize,

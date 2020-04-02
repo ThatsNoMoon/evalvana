@@ -1,5 +1,10 @@
+use zerocopy::{
+    AsBytes,
+    FromBytes,
+};
+
 #[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default, AsBytes, FromBytes)]
 pub struct Color {
     pub rgb: [f32; 3],
 }

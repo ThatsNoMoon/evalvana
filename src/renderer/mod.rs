@@ -4,11 +4,17 @@ use color::Color;
 pub mod text;
 use text::TextRenderer;
 
+mod drawable;
+use drawable::{
+	Drawable,
+	DrawingContext,
+};
+
 use crate::config::Config;
+use crate::interface::Interface;
 
 use std::time::Instant;
 
-use cgmath::{Vector2, vec2};
 use winit::{
 	window::Window,
 	dpi::PhysicalSize,
@@ -20,7 +26,11 @@ use wgpu_glyph::{
 	SectionText,
 	VariedSection,
 };
-
+use zerocopy::{
+	AsBytes,
+	FromBytes,
+};
+use crossbeam_channel::bounded as bounded_channel;
 
 const RENDER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 
@@ -40,8 +50,8 @@ pub struct Renderer {
 
 	text_renderer: TextRenderer,
 
-	vertices: Vec<Vertex>,
-	indices: Vec<u16>,
+	vertices: Option<Vec<Vertex>>,
+	indices: Option<Vec<VertexIndex>>,
 	vertex_buffer: wgpu::Buffer,
 	index_buffer: wgpu::Buffer,
 
@@ -50,7 +60,8 @@ pub struct Renderer {
 }
 
 impl Renderer {
-	pub fn new(window: &Window, size: PhysicalSize<u32>) -> Renderer {
+	pub fn new(window: &Window) -> Renderer {
+		let size = window.inner_size();
 		let surface = wgpu::Surface::create(window);
 
 		let adapter = wgpu::Adapter::request(
@@ -126,7 +137,7 @@ impl Renderer {
 					write_mask: wgpu::ColorWrite::ALL,
 				}],
 				depth_stencil_state: None,
-				index_format: wgpu::IndexFormat::Uint16,
+				index_format: VertexIndex::WGPU_FORMAT,
 				vertex_buffers: &[
 					wgpu::VertexBufferDescriptor {
 						stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
@@ -151,28 +162,15 @@ impl Renderer {
 			}
 		);
 
-		let vertices = [
-			Vertex { pos: vec2(-0.5, -0.5), color: Color::from_rgb_u8(0xFF, 0, 0) },
-			Vertex { pos: vec2(0.5, -0.5), color: Color::from_rgb_u8(0, 0xFF, 0) },
-			Vertex { pos: vec2(0.5, 0.5), color: Color::from_rgb_u8(0, 0, 0xFF) },
-			Vertex { pos: vec2(-0.5, 0.5), color: Color::from_rgb_u8(0xFF, 0xFF, 0xFF) },
-		];
+		let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+			size: 500 * std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
+			usage: wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::MAP_WRITE,
+		});
 
-		let indices = [
-			0u16, 1, 2, 2, 3, 0
-		];
-
-		let vertex_buffer = device.create_buffer_mapped(
-			vertices.len(),
-			wgpu::BufferUsage::VERTEX,
-		)
-			.fill_from_slice(&vertices[..]);
-
-		let index_buffer = device.create_buffer_mapped(
-			indices.len(),
-			wgpu::BufferUsage::INDEX,
-		)
-			.fill_from_slice(&indices[..]);
+		let index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+			size: 500 * std::mem::size_of::<VertexIndex>() as wgpu::BufferAddress,
+			usage: wgpu::BufferUsage::INDEX | wgpu::BufferUsage::MAP_WRITE,
+		});
 
 		let sc_desc = wgpu::SwapChainDescriptor {
 			usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
@@ -202,8 +200,8 @@ impl Renderer {
 
 			text_renderer,
 
-			vertices: vertices.to_vec(),
-			indices: indices.to_vec(),
+			vertices: Some(vec![]),
+			indices: Some(vec![]),
 			vertex_buffer,
 			index_buffer,
 
@@ -212,7 +210,37 @@ impl Renderer {
 		}
 	}
 
-   pub fn redraw(&mut self, config: &Config) {
+	pub fn redraw(&mut self, window: &Window, config: &Config, interface: &mut Interface) {
+
+		let mut vertices = self.vertices.take().unwrap();
+		let mut indices = self.indices.take().unwrap();
+		vertices.clear();
+		indices.clear();
+		let ctx = DrawingContext::new(window, config, &mut vertices, &mut indices, &mut self.text_renderer);
+		interface.draw(ctx);
+		let n_indices = indices.len() as u32;
+
+		let (vertex_sender, vertex_receiver) = bounded_channel(1);
+		let (index_sender, index_receiver) = bounded_channel(1);
+
+		self.vertex_buffer.map_write_async(
+			0,
+			vertices.as_bytes().len() as wgpu::BufferAddress,
+			move |vertex_buffer| {
+				vertex_buffer.unwrap().data.copy_from_slice(vertices.as_slice());
+				vertex_sender.send(vertices);
+			}
+		);
+
+		self.index_buffer.map_write_async(
+			0,
+			indices.as_bytes().len() as wgpu::BufferAddress,
+			move |index_buffer| {
+				index_buffer.unwrap().data.copy_from_slice(indices.as_slice());
+				index_sender.send(indices);
+			}
+		);
+
 		let frame = self.swap_chain
 			.get_next_texture();
 		let mut encoder = self.device.create_command_encoder(
@@ -235,11 +263,19 @@ impl Renderer {
 			rpass.set_bind_group(0, &self.bind_group, &[]);
 			rpass.set_vertex_buffers(0, &[(&self.vertex_buffer, 0)]);
 			rpass.set_index_buffer(&self.index_buffer, 0);
-			rpass.draw_indexed(0..self.indices.len() as u32, 0, 0..1);
+			rpass.draw_indexed(0..n_indices, 0, 0..1);
 		}
 
 		{
-			let text_pos = clip_to_pixel_coordinates(vec2(-0.5, -0.6), self.swap_chain_descriptor.width, self.swap_chain_descriptor.height);
+			self.text_renderer.draw_queued(
+				&mut self.device,
+				&mut encoder,
+				&frame.view,
+				self.swap_chain_descriptor.width,
+				self.swap_chain_descriptor.height,
+			).expect("Failed to draw glyphs");
+			/*
+			let text_pos = clip_to_pixel_coordinates(vec2(-0.5, -0.75), self.swap_chain_descriptor.width, self.swap_chain_descriptor.height);
 			let text_section = Section {
 				text: "Hello, world!",
 				screen_position: (text_pos.x, text_pos.y),
@@ -277,9 +313,23 @@ impl Renderer {
 				self.swap_chain_descriptor.width,
 				self.swap_chain_descriptor.height,
 			).unwrap();
+			*/
 		}
 
+		self.device.poll(true);
+
+		self.vertices = Some(vertex_receiver.recv().expect("Failed to receive vertex list"));
+		self.indices = Some(index_receiver.recv().expect("Failed to receive index list"));
+
+		self.vertex_buffer.unmap();
+		self.index_buffer.unmap();
+
 		self.queue.submit(&[encoder.finish()]);
+
+		let delta = self.last_frame.elapsed().as_secs_f32();
+		let range = 1..self.delta_times.len();
+		self.delta_times.copy_within(range, 0);
+		*self.delta_times.last_mut().unwrap() = delta;
 
 		self.last_frame = Instant::now();
 	} 
@@ -292,12 +342,45 @@ impl Renderer {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, AsBytes, FromBytes)]
+pub struct Point {
+	x: f32,
+	y: f32,
+}
+
+pub fn point(x: f32, y: f32) -> Point {
+	Point {
+		x,
+		y,
+	}
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, AsBytes, FromBytes)]
 pub struct Vertex {
-	pos: Vector2<f32>,
+	pos: Point,
 	color: Color,
 }
 
-fn clip_to_pixel_coordinates(clip: cgmath::Vector2<f32>, width: u32, height: u32) -> cgmath::Vector2<f32> {
-	vec2((clip.x + 1.0) / 2.0 * (width as f32), (clip.y + 1.0) / 2.0 * (height as f32))
+impl Vertex {
+	pub fn new(pos: Point, color: Color) -> Vertex {
+		Vertex {
+			pos,
+			color,
+		}
+	}
+}
+
+pub type VertexIndex = u16;
+
+trait VertexIndexFormat {
+	const WGPU_FORMAT: wgpu::IndexFormat;
+}
+
+impl VertexIndexFormat for u16 {
+	const WGPU_FORMAT: wgpu::IndexFormat = wgpu::IndexFormat::Uint16;
+}
+
+impl VertexIndexFormat for u32 {
+	const WGPU_FORMAT: wgpu::IndexFormat = wgpu::IndexFormat::Uint32;
 }
