@@ -101,10 +101,7 @@ impl App {
 				}
 
 				Event::WindowEvent {
-					event: WindowEvent::ScaleFactorChanged {
-						scale_factor,
-						..
-					},
+					event: WindowEvent::ScaleFactorChanged { scale_factor, .. },
 					..
 				} => {
 					App::set_scaled_icon(&window, scale_factor);
@@ -133,7 +130,10 @@ impl App {
 			Icon::from_rgba(logo_pixels, logo_w, logo_h).unwrap()
 		}
 
-		let icon_bytes = match (scale_factor.ceil() as u8).checked_next_power_of_two().unwrap_or_else(|| panic!("Invalid scale factor {}", scale_factor)) {
+		let icon_bytes = match (scale_factor.ceil() as u8)
+			.checked_next_power_of_two()
+			.unwrap_or_else(|| panic!("Invalid scale factor {}", scale_factor))
+		{
 			1 => ICON16,
 			2 => ICON32,
 			4 => ICON64,
@@ -146,7 +146,11 @@ impl App {
 		{
 			use winit::platform::windows::WindowExtWindows;
 
-			let large_icon_bytes = match (scale_factor.ceil() as u8).checked_next_power_of_two().unwrap_or_else(|| panic!("Invalid scale factor {}", scale_factor)) {
+			let large_icon_bytes = match (scale_factor.ceil() as u8)
+				.checked_next_power_of_two()
+				.unwrap_or_else(|| {
+					panic!("Invalid scale factor {}", scale_factor)
+				}) {
 				1 => ICON32,
 				2 => ICON64,
 				_ => ICON128,
