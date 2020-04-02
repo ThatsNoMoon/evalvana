@@ -5,36 +5,26 @@ pub mod text;
 use text::TextRenderer;
 
 mod drawable;
-use drawable::{
-	Drawable,
-	DrawingContext,
-};
+use drawable::{Drawable, DrawingContext};
 
 use crate::config::Config;
 use crate::interface::Interface;
 
 use std::time::Instant;
 
-use winit::{
-	window::Window,
-	dpi::PhysicalSize,
-};
-use wgpu_glyph::{
-	Section,
-	GlyphBrushBuilder,
-	Scale as FontScale,
-	SectionText,
-	VariedSection,
-};
-use zerocopy::{
-	AsBytes,
-	FromBytes,
-};
 use crossbeam_channel::bounded as bounded_channel;
+use wgpu_glyph::{
+	GlyphBrushBuilder, Scale as FontScale, Section, SectionText, VariedSection,
+};
+use winit::{dpi::PhysicalSize, window::Window};
+use zerocopy::{AsBytes, FromBytes};
 
 const RENDER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 
-const FONT: &'static [u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/fonts/JetBrainsMono-Regular.ttf"));
+const FONT: &'static [u8] = include_bytes!(concat!(
+	env!("CARGO_MANIFEST_DIR"),
+	"/assets/fonts/JetBrainsMono-Regular.ttf"
+));
 
 pub struct Renderer {
 	surface: wgpu::Surface,
@@ -64,47 +54,53 @@ impl Renderer {
 		let size = window.inner_size();
 		let surface = wgpu::Surface::create(window);
 
-		let adapter = wgpu::Adapter::request(
-			&wgpu::RequestAdapterOptions {
-				power_preference: wgpu::PowerPreference::Default,
-				backends: wgpu::BackendBit::PRIMARY,
-			},
-		).unwrap();
+		let adapter = wgpu::Adapter::request(&wgpu::RequestAdapterOptions {
+			power_preference: wgpu::PowerPreference::Default,
+			backends: wgpu::BackendBit::PRIMARY,
+		})
+		.unwrap();
 
-		let (mut device, queue) = adapter.request_device(&wgpu::DeviceDescriptor {
-			extensions: wgpu::Extensions {
-				anisotropic_filtering: false,
-			},
-			limits: wgpu::Limits::default(),
-		});
+		let (mut device, queue) =
+			adapter.request_device(&wgpu::DeviceDescriptor {
+				extensions: wgpu::Extensions {
+					anisotropic_filtering: false,
+				},
+				limits: wgpu::Limits::default(),
+			});
 
 		let text_renderer = TextRenderer::new(&mut device, FONT, RENDER_FORMAT);
 
-		let vs = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/target/shaders/shader.vert.spv"));
+		let vs = include_bytes!(concat!(
+			env!("CARGO_MANIFEST_DIR"),
+			"/target/shaders/shader.vert.spv"
+		));
 		let vs_module = device.create_shader_module(
-			&wgpu::read_spirv(std::io::Cursor::new(&vs[..])).unwrap()
+			&wgpu::read_spirv(std::io::Cursor::new(&vs[..])).unwrap(),
 		);
 
-		let fs = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/target/shaders/shader.frag.spv"));
+		let fs = include_bytes!(concat!(
+			env!("CARGO_MANIFEST_DIR"),
+			"/target/shaders/shader.frag.spv"
+		));
 		let fs_module = device.create_shader_module(
-			&wgpu::read_spirv(std::io::Cursor::new(&fs[..])).unwrap()
+			&wgpu::read_spirv(std::io::Cursor::new(&fs[..])).unwrap(),
 		);
 
-		let bind_group_layout = device.create_bind_group_layout(
-			&wgpu::BindGroupLayoutDescriptor { bindings: &[] }
-		);
+		let bind_group_layout =
+			device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+				bindings: &[],
+			});
 		let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
 			layout: &bind_group_layout,
 			bindings: &[],
 		});
-		let pipeline_layout = device.create_pipeline_layout(
-			&wgpu::PipelineLayoutDescriptor {
+		let pipeline_layout =
+			device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 				bind_group_layouts: &[&bind_group_layout],
-			}
-		);
+			});
 
-		let render_pipeline = device.create_render_pipeline(
-			&wgpu::RenderPipelineDescriptor {
+		let render_pipeline =
+			device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
 				layout: &pipeline_layout,
 				vertex_stage: wgpu::ProgrammableStageDescriptor {
 					module: &vs_module,
@@ -138,29 +134,29 @@ impl Renderer {
 				}],
 				depth_stencil_state: None,
 				index_format: VertexIndex::WGPU_FORMAT,
-				vertex_buffers: &[
-					wgpu::VertexBufferDescriptor {
-						stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
-						step_mode: wgpu::InputStepMode::Vertex,
-						attributes: &[
-							wgpu::VertexAttributeDescriptor {
-								offset: memoffset::offset_of!(Vertex, pos) as wgpu::BufferAddress,
-								format: wgpu::VertexFormat::Float2,
-								shader_location: 0,
-							},
-							wgpu::VertexAttributeDescriptor {
-								offset: memoffset::offset_of!(Vertex, color) as wgpu::BufferAddress,
-								format: wgpu::VertexFormat::Float3,
-								shader_location: 1,
-							}
-						]
-					}
-				],
+				vertex_buffers: &[wgpu::VertexBufferDescriptor {
+					stride: std::mem::size_of::<Vertex>()
+						as wgpu::BufferAddress,
+					step_mode: wgpu::InputStepMode::Vertex,
+					attributes: &[
+						wgpu::VertexAttributeDescriptor {
+							offset: memoffset::offset_of!(Vertex, pos)
+								as wgpu::BufferAddress,
+							format: wgpu::VertexFormat::Float2,
+							shader_location: 0,
+						},
+						wgpu::VertexAttributeDescriptor {
+							offset: memoffset::offset_of!(Vertex, color)
+								as wgpu::BufferAddress,
+							format: wgpu::VertexFormat::Float3,
+							shader_location: 1,
+						},
+					],
+				}],
 				sample_count: 1,
 				sample_mask: !0,
 				alpha_to_coverage_enabled: false,
-			}
-		);
+			});
 
 		let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
 			size: 500 * std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
@@ -168,7 +164,8 @@ impl Renderer {
 		});
 
 		let index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-			size: 500 * std::mem::size_of::<VertexIndex>() as wgpu::BufferAddress,
+			size: 500
+				* std::mem::size_of::<VertexIndex>() as wgpu::BufferAddress,
 			usage: wgpu::BufferUsage::INDEX | wgpu::BufferUsage::MAP_WRITE,
 		});
 
@@ -210,13 +207,23 @@ impl Renderer {
 		}
 	}
 
-	pub fn redraw(&mut self, window: &Window, config: &Config, interface: &mut Interface) {
-
+	pub fn redraw(
+		&mut self,
+		window: &Window,
+		config: &Config,
+		interface: &mut Interface,
+	) {
 		let mut vertices = self.vertices.take().unwrap();
 		let mut indices = self.indices.take().unwrap();
 		vertices.clear();
 		indices.clear();
-		let ctx = DrawingContext::new(window, config, &mut vertices, &mut indices, &mut self.text_renderer);
+		let ctx = DrawingContext::new(
+			window,
+			config,
+			&mut vertices,
+			&mut indices,
+			&mut self.text_renderer,
+		);
 		interface.draw(ctx);
 		let n_indices = indices.len() as u32;
 
@@ -227,38 +234,44 @@ impl Renderer {
 			0,
 			vertices.as_bytes().len() as wgpu::BufferAddress,
 			move |vertex_buffer| {
-				vertex_buffer.unwrap().data.copy_from_slice(vertices.as_slice());
+				vertex_buffer
+					.unwrap()
+					.data
+					.copy_from_slice(vertices.as_slice());
 				vertex_sender.send(vertices);
-			}
+			},
 		);
 
 		self.index_buffer.map_write_async(
 			0,
 			indices.as_bytes().len() as wgpu::BufferAddress,
 			move |index_buffer| {
-				index_buffer.unwrap().data.copy_from_slice(indices.as_slice());
+				index_buffer
+					.unwrap()
+					.data
+					.copy_from_slice(indices.as_slice());
 				index_sender.send(indices);
-			}
+			},
 		);
 
-		let frame = self.swap_chain
-			.get_next_texture();
+		let frame = self.swap_chain.get_next_texture();
 		let mut encoder = self.device.create_command_encoder(
-			&wgpu::CommandEncoderDescriptor { todo: 0 }
+			&wgpu::CommandEncoderDescriptor { todo: 0 },
 		);
 		{
-			let mut rpass = encoder.begin_render_pass(
-				&wgpu::RenderPassDescriptor {
-					color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-						attachment: &frame.view,
-						resolve_target: None,
-						load_op: wgpu::LoadOp::Clear,
-						store_op: wgpu::StoreOp::Store,
-						clear_color: config.ui_colors.bg.to_wgpu(),
-					}],
+			let mut rpass =
+				encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+					color_attachments: &[
+						wgpu::RenderPassColorAttachmentDescriptor {
+							attachment: &frame.view,
+							resolve_target: None,
+							load_op: wgpu::LoadOp::Clear,
+							store_op: wgpu::StoreOp::Store,
+							clear_color: config.ui_colors.bg.to_wgpu(),
+						},
+					],
 					depth_stencil_attachment: None,
-				}
-			);
+				});
 			rpass.set_pipeline(&self.render_pipeline);
 			rpass.set_bind_group(0, &self.bind_group, &[]);
 			rpass.set_vertex_buffers(0, &[(&self.vertex_buffer, 0)]);
@@ -267,13 +280,15 @@ impl Renderer {
 		}
 
 		{
-			self.text_renderer.draw_queued(
-				&mut self.device,
-				&mut encoder,
-				&frame.view,
-				self.swap_chain_descriptor.width,
-				self.swap_chain_descriptor.height,
-			).expect("Failed to draw glyphs");
+			self.text_renderer
+				.draw_queued(
+					&mut self.device,
+					&mut encoder,
+					&frame.view,
+					self.swap_chain_descriptor.width,
+					self.swap_chain_descriptor.height,
+				)
+				.expect("Failed to draw glyphs");
 			/*
 			let text_pos = clip_to_pixel_coordinates(vec2(-0.5, -0.75), self.swap_chain_descriptor.width, self.swap_chain_descriptor.height);
 			let text_section = Section {
@@ -283,7 +298,7 @@ impl Renderer {
 				scale: FontScale::uniform(40.0),
 				..Section::default()
 			};
-			
+
 			self.text_renderer.queue(text_section);
 
 			let delta = self.last_frame.elapsed().as_secs_f32();
@@ -318,8 +333,13 @@ impl Renderer {
 
 		self.device.poll(true);
 
-		self.vertices = Some(vertex_receiver.recv().expect("Failed to receive vertex list"));
-		self.indices = Some(index_receiver.recv().expect("Failed to receive index list"));
+		self.vertices = Some(
+			vertex_receiver
+				.recv()
+				.expect("Failed to receive vertex list"),
+		);
+		self.indices =
+			Some(index_receiver.recv().expect("Failed to receive index list"));
 
 		self.vertex_buffer.unmap();
 		self.index_buffer.unmap();
@@ -332,12 +352,14 @@ impl Renderer {
 		*self.delta_times.last_mut().unwrap() = delta;
 
 		self.last_frame = Instant::now();
-	} 
+	}
 
 	pub fn resize(&mut self, size: PhysicalSize<u32>) {
 		self.swap_chain_descriptor.width = size.width;
 		self.swap_chain_descriptor.height = size.height;
-		self.swap_chain = self.device.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
+		self.swap_chain = self
+			.device
+			.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
 	}
 }
 
@@ -349,10 +371,7 @@ pub struct Point {
 }
 
 pub fn point(x: f32, y: f32) -> Point {
-	Point {
-		x,
-		y,
-	}
+	Point { x, y }
 }
 
 #[repr(C)]
@@ -364,10 +383,7 @@ pub struct Vertex {
 
 impl Vertex {
 	pub fn new(pos: Point, color: Color) -> Vertex {
-		Vertex {
-			pos,
-			color,
-		}
+		Vertex { pos, color }
 	}
 }
 

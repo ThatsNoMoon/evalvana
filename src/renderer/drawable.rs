@@ -1,36 +1,17 @@
 use super::{
-	Point,
-	point,
-	Vertex, 
-	VertexIndex,
-	text::TextRenderer,
-	color::Color,
+	color::Color, point, text::TextRenderer, Point, Vertex, VertexIndex,
 };
 
-use crate::repl::{
-	evaluation::{
-		EditedExpression,
-		Expression,
-		Result as EvaluationResult,
-		PlainResult,
-		CompoundResult,
-		Evaluation,
-	},
-};
-use crate::interface::{
-	Interface,
-	Panes,
-	Pane,
-	PaneList,
-};
 use crate::config::Config;
+use crate::interface::{Interface, Pane, PaneList, Panes};
+use crate::repl::evaluation::{
+	CompoundResult, EditedExpression, Evaluation, Expression, PlainResult,
+	Result as EvaluationResult,
+};
 
 use std::convert::TryInto;
 
-use winit::{
-	window::Window,
-	dpi::LogicalSize,
-};
+use winit::{dpi::LogicalSize, window::Window};
 
 pub struct DrawingContext<'a> {
 	bounding_box: BoundingBox,
@@ -47,9 +28,10 @@ impl<'a> DrawingContext<'a> {
 		config: &'a Config,
 		vertex_buffer: &'a mut Vec<Vertex>,
 		index_buffer: &'a mut Vec<VertexIndex>,
-		text_renderer: &'a mut TextRenderer
+		text_renderer: &'a mut TextRenderer,
 	) -> DrawingContext<'a> {
-		let LogicalSize { width, height } = window.inner_size().to_logical(window.scale_factor());
+		let LogicalSize { width, height } =
+			window.inner_size().to_logical(window.scale_factor());
 		DrawingContext {
 			bounding_box: BoundingBox::new(0, 0, width, height),
 			window,
@@ -60,7 +42,10 @@ impl<'a> DrawingContext<'a> {
 		}
 	}
 
-	fn with_bounding_box(&mut self, bounding_box: BoundingBox) -> DrawingContext<'_> {
+	fn with_bounding_box(
+		&mut self,
+		bounding_box: BoundingBox,
+	) -> DrawingContext<'_> {
 		DrawingContext {
 			bounding_box,
 			window: self.window,
@@ -71,25 +56,57 @@ impl<'a> DrawingContext<'a> {
 		}
 	}
 
-	fn draw_solid_rect(
-		&mut self,
-		bounding_box: BoundingBox,
-		color: Color,
-	) {
-		let LogicalSize { width: w, height: h } = self.window.inner_size().to_logical(self.window.scale_factor());
-		let start_idx: u16 = self.vertex_buffer.len().try_into().expect("More than u16::MAX vertices");
+	fn draw_solid_rect(&mut self, bounding_box: BoundingBox, color: Color) {
+		let LogicalSize {
+			width: w,
+			height: h,
+		} = self
+			.window
+			.inner_size()
+			.to_logical(self.window.scale_factor());
+		let start_idx: u16 = self
+			.vertex_buffer
+			.len()
+			.try_into()
+			.expect("More than u16::MAX vertices");
 		self.vertex_buffer.extend_from_slice(&[
-			Vertex::new(pixel_to_clip(bounding_box.x, bounding_box.y, w, h), color),
-			Vertex::new(pixel_to_clip(bounding_box.x + bounding_box.w, bounding_box.y, w, h), color),
-			Vertex::new(pixel_to_clip(bounding_box.x + bounding_box.w, bounding_box.y + bounding_box.h, w, h), color),
-			Vertex::new(pixel_to_clip(bounding_box.x, bounding_box.y + bounding_box.h, w, h), color),
+			Vertex::new(
+				pixel_to_clip(bounding_box.x, bounding_box.y, w, h),
+				color,
+			),
+			Vertex::new(
+				pixel_to_clip(
+					bounding_box.x + bounding_box.w,
+					bounding_box.y,
+					w,
+					h,
+				),
+				color,
+			),
+			Vertex::new(
+				pixel_to_clip(
+					bounding_box.x + bounding_box.w,
+					bounding_box.y + bounding_box.h,
+					w,
+					h,
+				),
+				color,
+			),
+			Vertex::new(
+				pixel_to_clip(
+					bounding_box.x,
+					bounding_box.y + bounding_box.h,
+					w,
+					h,
+				),
+				color,
+			),
 		]);
 
 		self.index_buffer.extend_from_slice(&[
 			0 + start_idx,
 			1 + start_idx,
 			2 + start_idx,
-
 			0 + start_idx,
 			3 + start_idx,
 			2 + start_idx,
@@ -107,12 +124,7 @@ pub struct BoundingBox {
 
 impl BoundingBox {
 	fn new(x: u32, y: u32, w: u32, h: u32) -> BoundingBox {
-		BoundingBox {
-			x,
-			y,
-			w,
-			h,
-		}
+		BoundingBox { x, y, w, h }
 	}
 }
 
@@ -131,7 +143,10 @@ impl Drawable for Panes {
 		match self {
 			Panes::VerticalSplit(PaneList { panes, focused }) => {
 				if panes.is_empty() {
-					ctx.draw_solid_rect(ctx.bounding_box, ctx.config.ui_colors.bg);
+					ctx.draw_solid_rect(
+						ctx.bounding_box,
+						ctx.config.ui_colors.bg,
+					);
 					return ctx.bounding_box;
 				}
 				let n: u32 = panes.len().try_into().unwrap();
@@ -141,14 +156,17 @@ impl Drawable for Panes {
 						ctx.bounding_box.x + ctx.bounding_box.w / n * i,
 						ctx.bounding_box.y,
 						ctx.bounding_box.w / n,
-						ctx.bounding_box.h
+						ctx.bounding_box.h,
 					);
 					pane.draw(ctx.with_bounding_box(bounding_box));
 				}
-			},
+			}
 			Panes::HorizontalSplit(PaneList { panes, focused }) => {
 				if panes.is_empty() {
-					ctx.draw_solid_rect(ctx.bounding_box, ctx.config.ui_colors.bg);
+					ctx.draw_solid_rect(
+						ctx.bounding_box,
+						ctx.config.ui_colors.bg,
+					);
 					return ctx.bounding_box;
 				}
 				let n: u32 = panes.len().try_into().unwrap();
@@ -158,14 +176,17 @@ impl Drawable for Panes {
 						ctx.bounding_box.x,
 						ctx.bounding_box.y + ctx.bounding_box.h / n * i,
 						ctx.bounding_box.w,
-						ctx.bounding_box.h / n
+						ctx.bounding_box.h / n,
 					);
 					pane.draw(ctx.with_bounding_box(bounding_box));
 				}
-			},
+			}
 			Panes::Tabbed(PaneList { panes, focused }) => {
 				if panes.is_empty() {
-					ctx.draw_solid_rect(ctx.bounding_box, ctx.config.ui_colors.bg);
+					ctx.draw_solid_rect(
+						ctx.bounding_box,
+						ctx.config.ui_colors.bg,
+					);
 					return ctx.bounding_box;
 				}
 			}
@@ -174,7 +195,6 @@ impl Drawable for Panes {
 		ctx.bounding_box
 	}
 }
-
 
 fn pixel_to_clip(x: u32, y: u32, w: u32, h: u32) -> Point {
 	point(x as f32 / (w as f32) - 0.5, y as f32 / (h as f32) - 0.5)

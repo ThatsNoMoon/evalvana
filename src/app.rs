@@ -1,21 +1,18 @@
-use crate::config::{Config, UiColors, EditorColors};
+use crate::config::{Config, EditorColors, UiColors};
 use crate::interface::Interface;
-use crate::renderer::{
-	Renderer,
-	color::Color,
-};
+use crate::renderer::{color::Color, Renderer};
 
+use image::{png::PngDecoder, ImageDecoder};
 use winit::{
 	event::{Event, WindowEvent},
 	event_loop::{ControlFlow, EventLoop},
-	window::{WindowBuilder, Window, Icon},
-};
-use image::{
-	png::PngDecoder,
-	ImageDecoder,
+	window::{Icon, Window, WindowBuilder},
 };
 
-const ICON: &'static [u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/icons/logo.png"));
+const ICON: &'static [u8] = include_bytes!(concat!(
+	env!("CARGO_MANIFEST_DIR"),
+	"/assets/icons/logo.png"
+));
 
 pub struct App {
 	window: Window,
@@ -45,9 +42,8 @@ impl App {
 				constants: Color::from_rgb_u32(0x56B6C2),
 				types: Color::from_rgb_u32(0x61AFEF),
 				functions: Color::from_rgb_u32(0xABB2BF),
-			}
+			},
 		};
-
 
 		let event_loop = EventLoop::new();
 
@@ -80,7 +76,14 @@ impl App {
 	}
 
 	pub fn run(self) {
-		let App { window, event_loop, mut renderer, mut interface, config, .. } = self;
+		let App {
+			window,
+			event_loop,
+			mut renderer,
+			mut interface,
+			config,
+			..
+		} = self;
 		event_loop.run(move |event, _, control_flow| {
 			*control_flow = ControlFlow::Poll;
 
@@ -92,11 +95,11 @@ impl App {
 					..
 				} => {
 					renderer.resize(size);
-				},
+				}
 
 				Event::RedrawRequested(_) => {
 					renderer.redraw(&window, &config, &mut interface);
-				},
+				}
 
 				Event::WindowEvent {
 					event: WindowEvent::CloseRequested,

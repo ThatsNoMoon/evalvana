@@ -1,11 +1,11 @@
 #![allow(dead_code, unused_imports)]
 
 pub mod app;
+pub mod config;
+pub mod input;
 pub mod interface;
 pub mod renderer;
 pub mod repl;
-pub mod config;
-pub mod input;
 
 fn main() {
 	env_logger::init();
@@ -13,6 +13,4 @@ fn main() {
 	let app = app::App::new();
 
 	app.run();
-
 }
-

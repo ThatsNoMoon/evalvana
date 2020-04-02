@@ -1,7 +1,4 @@
-use crate::repl::evaluation::{
-	Evaluation,
-	EditedExpression,
-};
+use crate::repl::evaluation::{EditedExpression, Evaluation};
 
 use crate::input::commands::Command;
 
@@ -20,7 +17,7 @@ impl Pane {
 			current_input: EditedExpression::default(),
 		}
 	}
-	
+
 	pub fn handle_input(&mut self, input: Command) {
 		self.current_input.handle_input(input);
 	}
