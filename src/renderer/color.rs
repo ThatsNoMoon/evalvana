@@ -5,7 +5,7 @@ use zerocopy::{AsBytes, FromBytes};
 	Debug, Clone, Copy, PartialEq, PartialOrd, Default, AsBytes, FromBytes,
 )]
 pub struct Color {
-	pub rgb: [f32; 3],
+	rgb: [f32; 3],
 }
 
 use std::fmt;
@@ -49,6 +49,10 @@ impl Color {
 		let (r, g, b) = ((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
 		let (r, g, b) = (r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0);
 		Color { rgb: [r, g, b] }
+	}
+
+	pub fn to_rgb(&self) -> [f32; 3] {
+		self.rgb
 	}
 
 	pub fn to_rgba(&self) -> [f32; 4] {
