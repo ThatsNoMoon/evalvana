@@ -238,7 +238,9 @@ impl Renderer {
 					.unwrap()
 					.data
 					.copy_from_slice(vertices.as_slice());
-				vertex_sender.send(vertices);
+				vertex_sender
+					.send(vertices)
+					.expect("Failed to send vertex list");
 			},
 		);
 
@@ -250,7 +252,9 @@ impl Renderer {
 					.unwrap()
 					.data
 					.copy_from_slice(indices.as_slice());
-				index_sender.send(indices);
+				index_sender
+					.send(indices)
+					.expect("Failed to send index list");
 			},
 		);
 
@@ -289,46 +293,6 @@ impl Renderer {
 					self.swap_chain_descriptor.height,
 				)
 				.expect("Failed to draw glyphs");
-			/*
-			let text_pos = clip_to_pixel_coordinates(vec2(-0.5, -0.75), self.swap_chain_descriptor.width, self.swap_chain_descriptor.height);
-			let text_section = Section {
-				text: "Hello, world!",
-				screen_position: (text_pos.x, text_pos.y),
-				color: config.editor_colors.main.to_rgba(),
-				scale: FontScale::uniform(40.0),
-				..Section::default()
-			};
-
-			self.text_renderer.queue(text_section);
-
-			let delta = self.last_frame.elapsed().as_secs_f32();
-			let range = 1..self.delta_times.len();
-			self.delta_times.copy_within(range, 0);
-			*self.delta_times.last_mut().unwrap() = delta;
-
-			let avg_delta = self.delta_times.iter().sum::<f32>() / self.delta_times.len() as f32;
-
-			let fps = format!(
-				"current fps: {}",
-				(1.0 / avg_delta) as u32);
-
-			let fps_counter = Section {
-				text: fps.as_str(),
-				scale: FontScale::uniform(15.0),
-				color: config.ui_colors.text.to_rgba(),
-				..Section::default()
-			};
-
-			self.text_renderer.queue(fps_counter);
-
-			self.text_renderer.draw_queued(
-				&mut self.device,
-				&mut encoder,
-				&frame.view,
-				self.swap_chain_descriptor.width,
-				self.swap_chain_descriptor.height,
-			).unwrap();
-			*/
 		}
 
 		self.device.poll(true);
