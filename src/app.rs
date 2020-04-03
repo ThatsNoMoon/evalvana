@@ -4,6 +4,7 @@ use crate::renderer::{color::Color, Renderer};
 
 use image::{png::PngDecoder, ImageDecoder};
 use winit::{
+	dpi::LogicalSize,
 	event::{Event, WindowEvent},
 	event_loop::{ControlFlow, EventLoop},
 	window::{Icon, Window, WindowBuilder},
@@ -39,7 +40,9 @@ impl App {
 		let config = Config {
 			ui_colors: UiColors {
 				bg: Color::from_rgb_u32(0x282C34),
+				secondary_bg: Color::from_rgb_u32(0x1D2026),
 				text: Color::from_rgb_u32(0xABB2BF),
+				accent: Color::from_rgb_u32(0x61AFEF),
 				borders: Color::from_rgb_u32(0x4B5263),
 			},
 			editor_colors: EditorColors {
@@ -59,11 +62,14 @@ impl App {
 
 		let event_loop = EventLoop::new();
 
-		let window = WindowBuilder::new().build(&event_loop).unwrap();
+		let window = WindowBuilder::new()
+			.with_title("Evalvana")
+			.with_inner_size(LogicalSize::new(1400, 900))
+			.with_min_inner_size(LogicalSize::new(500, 300))
+			.build(&event_loop)
+			.unwrap();
 
 		App::set_scaled_icon(&window, 1.0);
-
-		window.set_title("Evalvana");
 
 		let renderer = Renderer::new(&window);
 

@@ -1,6 +1,8 @@
 pub mod color;
 use color::Color;
 
+mod bounding_box;
+
 pub mod text;
 use text::TextRenderer;
 
@@ -266,7 +268,7 @@ impl Renderer {
 							resolve_target: None,
 							load_op: wgpu::LoadOp::Clear,
 							store_op: wgpu::StoreOp::Store,
-							clear_color: config.ui_colors.bg.to_wgpu(),
+							clear_color: wgpu::Color::BLACK,
 						},
 					],
 					depth_stencil_attachment: None,

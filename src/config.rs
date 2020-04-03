@@ -9,7 +9,9 @@ pub struct Config {
 #[derive(Debug, Clone, PartialEq)]
 pub struct UiColors {
 	pub bg: Color,
+	pub secondary_bg: Color,
 	pub text: Color,
+	pub accent: Color,
 	pub borders: Color,
 }
 

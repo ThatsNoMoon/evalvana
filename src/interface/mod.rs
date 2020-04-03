@@ -1,9 +1,14 @@
 mod pane;
 pub use pane::Pane;
+mod tree_pane;
+pub use tree_pane::{
+	Evaluator, Evaluators, PaneStatus, PaneStatusList, PaneStatuses, TreePane,
+};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Interface {
 	pub panes: Panes,
+	pub tree_pane: TreePane,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
