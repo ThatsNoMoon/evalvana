@@ -21,11 +21,6 @@ use zerocopy::{AsBytes, FromBytes};
 
 const RENDER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 
-const FONT: &'static [u8] = include_bytes!(concat!(
-	env!("CARGO_MANIFEST_DIR"),
-	"/assets/fonts/JetBrainsMono-Regular.ttf"
-));
-
 pub struct Renderer {
 	surface: wgpu::Surface,
 	adapter: wgpu::Adapter,
@@ -68,7 +63,7 @@ impl Renderer {
 				limits: wgpu::Limits::default(),
 			});
 
-		let text_renderer = TextRenderer::new(&mut device, FONT, RENDER_FORMAT);
+		let text_renderer = TextRenderer::new(&mut device, RENDER_FORMAT);
 
 		let vs = include_bytes!(concat!(
 			env!("CARGO_MANIFEST_DIR"),

@@ -1,24 +1,38 @@
 use std::borrow::Cow;
 
 use wgpu_glyph::{
-	GlyphBrush, GlyphBrushBuilder, Scale as FontScale, Section, SectionText,
-	VariedSection,
+	FontId, GlyphBrush, GlyphBrushBuilder, Scale as FontScale, Section,
+	SectionText, VariedSection,
 };
+
+const EDITOR_FONT: &'static [u8] = include_bytes!(concat!(
+	env!("CARGO_MANIFEST_DIR"),
+	"/assets/fonts/JetBrainsMono/JetBrainsMono-Regular.ttf"
+));
+
+const UI_FONT: &'static [u8] = include_bytes!(concat!(
+	env!("CARGO_MANIFEST_DIR"),
+	"/assets/fonts/Roboto/Roboto-Regular.ttf"
+));
 
 pub struct TextRenderer {
 	glyph_brush: GlyphBrush<'static, ()>,
+	editor_font: FontId,
+	ui_font: FontId,
 }
 
 impl TextRenderer {
 	pub fn new(
 		device: &mut wgpu::Device,
-		font: &'static [u8],
 		texture_format: wgpu::TextureFormat,
 	) -> TextRenderer {
+		let mut builder =
+			GlyphBrushBuilder::using_font_bytes(EDITOR_FONT).unwrap();
+		let ui_font = builder.add_font_bytes(UI_FONT);
 		TextRenderer {
-			glyph_brush: GlyphBrushBuilder::using_font_bytes(font)
-				.unwrap()
-				.build(device, texture_format),
+			glyph_brush: builder.build(device, texture_format),
+			editor_font: FontId(0),
+			ui_font,
 		}
 	}
 
