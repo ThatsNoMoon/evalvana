@@ -2,6 +2,7 @@
 
 pub mod app;
 pub mod config;
+pub mod icons;
 pub mod input;
 pub mod interface;
 pub mod renderer;

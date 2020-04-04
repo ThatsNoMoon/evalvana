@@ -221,7 +221,7 @@ impl Renderer {
 			&mut indices,
 			&mut self.text_renderer,
 		);
-		interface.draw(ctx);
+		interface.draw(ctx, ());
 		let n_indices = indices.len() as u32;
 
 		let (vertex_sender, vertex_receiver) = bounded_channel(1);

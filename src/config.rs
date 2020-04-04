@@ -10,7 +10,10 @@ pub struct Config {
 pub struct UiColors {
 	pub bg: Color,
 	pub secondary_bg: Color,
+	pub focused_bg: Color,
+	pub unfocused_bg: Color,
 	pub text: Color,
+	pub unfocused_text: Color,
 	pub accent: Color,
 	pub borders: Color,
 }

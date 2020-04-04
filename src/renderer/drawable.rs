@@ -5,8 +5,8 @@ use super::{
 
 use crate::config::Config;
 use crate::interface::{
-	Evaluator, Evaluators, Interface, Pane, PaneList, PaneStatus,
-	PaneStatusList, PaneStatuses, Panes, TreePane,
+	Evaluator, Evaluators, Interface, Pane, PaneList, PaneStatus, PaneStatuses,
+	Panes, TreePane,
 };
 use crate::repl::evaluation::{
 	CompoundResult, EditedExpression, Evaluation, Expression, PlainResult,
@@ -16,7 +16,9 @@ use crate::repl::evaluation::{
 use std::borrow::Cow;
 use std::convert::TryInto;
 
-use wgpu_glyph::{Scale as FontScale, Section, VariedSection};
+use wgpu_glyph::{
+	Layout, Scale as FontScale, Section, VariedSection, VerticalAlign,
+};
 use winit::{dpi::LogicalSize, window::Window};
 
 pub struct DrawingContext<'a> {
@@ -139,26 +141,36 @@ impl<'a> DrawingContext<'a> {
 }
 
 pub trait Drawable {
-	fn draw(&mut self, ctx: DrawingContext<'_>) -> BoundingBox;
+	type UserData;
+	fn draw(
+		&mut self,
+		ctx: DrawingContext<'_>,
+		data: Self::UserData,
+	) -> BoundingBox;
 }
 
 impl Drawable for Interface {
-	fn draw(&mut self, mut ctx: DrawingContext<'_>) -> BoundingBox {
+	type UserData = ();
+
+	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> BoundingBox {
 		let mut tree_bounding_box = ctx.bounding_box.with_w(225);
 		tree_bounding_box = self
 			.tree_pane
-			.draw(ctx.with_bounding_box(tree_bounding_box));
+			.draw(ctx.with_bounding_box(tree_bounding_box), ());
 		let mut panes_bounding_box =
 			ctx.bounding_box.added_left(tree_bounding_box.w);
-		panes_bounding_box =
-			self.panes.draw(ctx.with_bounding_box(panes_bounding_box));
+		panes_bounding_box = self
+			.panes
+			.draw(ctx.with_bounding_box(panes_bounding_box), true);
 
 		tree_bounding_box.added_w(panes_bounding_box.w)
 	}
 }
 
 impl Drawable for TreePane {
-	fn draw(&mut self, mut ctx: DrawingContext<'_>) -> BoundingBox {
+	type UserData = ();
+
+	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> BoundingBox {
 		ctx.draw_solid_rect(
 			ctx.bounding_box,
 			ctx.config.ui_colors.secondary_bg,
@@ -184,7 +196,7 @@ impl Drawable for TreePane {
 
 		let statuses_bounding_box = self
 			.pane_statuses
-			.draw(ctx.with_bounding_box(current_bounding_box));
+			.draw(ctx.with_bounding_box(current_bounding_box), ());
 
 		current_bounding_box = current_bounding_box
 			.added_top(statuses_bounding_box.h)
@@ -207,37 +219,32 @@ impl Drawable for TreePane {
 			.added_top(10);
 
 		self.evaluators
-			.draw(ctx.with_bounding_box(current_bounding_box));
+			.draw(ctx.with_bounding_box(current_bounding_box), ());
 		ctx.bounding_box
 	}
 }
 
 impl Drawable for PaneStatuses {
-	fn draw(&mut self, mut ctx: DrawingContext<'_>) -> BoundingBox {
-		let pane_status_list = match self {
-			PaneStatuses::VerticalSplit(list) => list,
-			PaneStatuses::HorizontalSplit(list) => list,
-			PaneStatuses::Tabbed(list) => list,
+	type UserData = ();
 
-			PaneStatuses::Single(status) => return status.draw(ctx),
-		};
-
-		if pane_status_list.pane_statuses.is_empty() {
-			return ctx.bounding_box.with_h(0);
-		}
-
-		pane_status_list.draw(ctx.reborrow())
-	}
-}
-
-impl Drawable for PaneStatusList {
-	fn draw(&mut self, mut ctx: DrawingContext<'_>) -> BoundingBox {
+	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> BoundingBox {
 		let mut current_bounding_box = ctx.bounding_box;
 		let mut drawn_bounding_box = ctx.bounding_box.with_h(0);
 
-		for inner_statuses in &mut self.pane_statuses {
-			let inner_bounding_box = inner_statuses
-				.draw(ctx.with_bounding_box(current_bounding_box));
+		for (i, pane_status) in self.pane_statuses.iter_mut().enumerate() {
+			let i: u32 = i.try_into().unwrap();
+			let mut inner_bounding_box = current_bounding_box.with_h(24);
+
+			inner_bounding_box = pane_status.draw(
+				ctx.with_bounding_box(inner_bounding_box),
+				i == self.focused,
+			);
+
+			if drawn_bounding_box.bottom() + inner_bounding_box.h
+				>= ctx.bounding_box.bottom()
+			{
+				break;
+			}
 
 			current_bounding_box =
 				current_bounding_box.added_top(inner_bounding_box.h);
@@ -249,20 +256,38 @@ impl Drawable for PaneStatusList {
 }
 
 impl Drawable for PaneStatus {
-	fn draw(&mut self, mut ctx: DrawingContext<'_>) -> BoundingBox {
-		let bounding_box = ctx.bounding_box.with_h(24).added_left(20);
+	type UserData = bool;
+
+	fn draw(
+		&mut self,
+		mut ctx: DrawingContext<'_>,
+		is_focused: bool,
+	) -> BoundingBox {
+		if is_focused {
+			ctx.draw_solid_rect(
+				ctx.bounding_box,
+				ctx.config.ui_colors.focused_bg,
+			);
+		}
+		let text_bounding_box = ctx
+			.bounding_box
+			.added_left(20)
+			.added_y(ctx.bounding_box.h / 2);
 		ctx.draw_text(Section {
 			text: self.name.as_str(),
 			color: ctx.config.ui_colors.text.to_rgba(),
 			font_id: ctx.text_renderer.ui_font(),
-			..bounding_box.to_section_bounds()
+			layout: Layout::default().v_align(VerticalAlign::Center),
+			..text_bounding_box.to_section_bounds()
 		});
-		bounding_box
+		ctx.bounding_box
 	}
 }
 
 impl Drawable for Evaluators {
-	fn draw(&mut self, mut ctx: DrawingContext<'_>) -> BoundingBox {
+	type UserData = ();
+
+	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> BoundingBox {
 		let mut current_bounding_box = ctx.bounding_box;
 		let mut drawn_bounding_box = ctx.bounding_box.with_h(0);
 
@@ -270,7 +295,13 @@ impl Drawable for Evaluators {
 			let mut inner_bounding_box = current_bounding_box.with_h(75);
 
 			inner_bounding_box =
-				evaluator.draw(ctx.with_bounding_box(inner_bounding_box));
+				evaluator.draw(ctx.with_bounding_box(inner_bounding_box), ());
+
+			if drawn_bounding_box.bottom() + inner_bounding_box.h
+				>= ctx.bounding_box.bottom()
+			{
+				break;
+			}
 
 			current_bounding_box =
 				current_bounding_box.added_top(inner_bounding_box.h);
@@ -282,7 +313,9 @@ impl Drawable for Evaluators {
 }
 
 impl Drawable for Evaluator {
-	fn draw(&mut self, mut ctx: DrawingContext<'_>) -> BoundingBox {
+	type UserData = ();
+
+	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> BoundingBox {
 		ctx.draw_solid_rect(
 			ctx.bounding_box
 				.added_left(13)
@@ -296,11 +329,10 @@ impl Drawable for Evaluator {
 			text: self.name.as_str(),
 			color: ctx.config.ui_colors.text.to_rgba(),
 			font_id: ctx.text_renderer.ui_font_medium(),
-			layout: wgpu_glyph::Layout::default()
-				.v_align(wgpu_glyph::VerticalAlign::Center),
+			layout: Layout::default().v_align(VerticalAlign::Center),
 			..ctx
 				.bounding_box
-				.added_x(22)
+				.added_left(22)
 				.added_y(ctx.bounding_box.h / 2)
 				.with_h(ctx.bounding_box.h / 3)
 				.to_section_bounds()
@@ -310,7 +342,13 @@ impl Drawable for Evaluator {
 }
 
 impl Drawable for Panes {
-	fn draw(&mut self, mut ctx: DrawingContext<'_>) -> BoundingBox {
+	type UserData = bool;
+
+	fn draw(
+		&mut self,
+		mut ctx: DrawingContext<'_>,
+		is_focused: bool,
+	) -> BoundingBox {
 		match self {
 			Panes::VerticalSplit(PaneList { panes, focused }) => {
 				if panes.is_empty() {
@@ -320,16 +358,31 @@ impl Drawable for Panes {
 					);
 					return ctx.bounding_box;
 				}
+
 				let n: u32 = panes.len().try_into().unwrap();
+				let inner_bounding_box = {
+					let total_width = ctx.bounding_box.w - 2 * (n - 1);
+					let total_width = total_width as f64;
+					let inner_pane_width = total_width / (n as f64);
+					let inner_pane_width = inner_pane_width.ceil() as u32;
+					ctx.bounding_box.with_w(inner_pane_width)
+				};
+
 				for (i, pane) in panes.iter_mut().enumerate() {
 					let i: u32 = i.try_into().unwrap();
-					let bounding_box = BoundingBox::new(
-						ctx.bounding_box.x + ctx.bounding_box.w / n * i,
-						ctx.bounding_box.y,
-						ctx.bounding_box.w / n,
-						ctx.bounding_box.h,
+					pane.draw(
+						ctx.with_bounding_box(
+							inner_bounding_box
+								.added_x((inner_bounding_box.w + 2) * i),
+						),
+						is_focused && i == *focused,
 					);
-					pane.draw(ctx.with_bounding_box(bounding_box));
+					ctx.draw_solid_rect(
+						inner_bounding_box
+							.added_x(inner_bounding_box.w)
+							.with_w(2),
+						ctx.config.ui_colors.borders,
+					);
 				}
 			}
 			Panes::HorizontalSplit(PaneList { panes, focused }) => {
@@ -340,29 +393,121 @@ impl Drawable for Panes {
 					);
 					return ctx.bounding_box;
 				}
+
 				let n: u32 = panes.len().try_into().unwrap();
+
+				let inner_bounding_box =
+					ctx.bounding_box.with_h(ctx.bounding_box.h / n);
+
 				for (i, pane) in panes.iter_mut().enumerate() {
 					let i: u32 = i.try_into().unwrap();
-					let bounding_box = BoundingBox::new(
-						ctx.bounding_box.x,
-						ctx.bounding_box.y + ctx.bounding_box.h / n * i,
-						ctx.bounding_box.w,
-						ctx.bounding_box.h / n,
+					pane.draw(
+						ctx.with_bounding_box(
+							inner_bounding_box
+								.added_y(inner_bounding_box.h * i),
+						),
+						is_focused && i == *focused,
 					);
-					pane.draw(ctx.with_bounding_box(bounding_box));
 				}
 			}
 			Panes::Tabbed(PaneList { panes, focused }) => {
 				if panes.is_empty() {
 					ctx.draw_solid_rect(
 						ctx.bounding_box,
-						ctx.config.ui_colors.bg,
+						ctx.config.ui_colors.borders,
 					);
 					return ctx.bounding_box;
 				}
+
+				let tabs_bg_bounding_box = ctx.bounding_box.with_h(40);
+
+				ctx.draw_solid_rect(
+					tabs_bg_bounding_box,
+					ctx.config.ui_colors.borders,
+				);
+
+				fn draw_tab(
+					mut ctx: DrawingContext<'_>,
+					title: &str,
+					tab_focused: bool,
+					parent_focused: bool,
+				) -> BoundingBox {
+					let bg_color = if tab_focused {
+						ctx.config.editor_colors.bg
+					} else {
+						ctx.config.ui_colors.unfocused_bg
+					};
+
+					let text_color = if tab_focused && parent_focused {
+						ctx.config.ui_colors.text
+					} else {
+						ctx.config.ui_colors.unfocused_text
+					};
+
+					let bounding_box = ctx
+						.bounding_box
+						.added_top(5)
+						.added_left(5)
+						.subbed_right(5);
+
+					ctx.draw_solid_rect(bounding_box, bg_color);
+
+					let text_bounding_box =
+						bounding_box.added_y(bounding_box.h / 2).added_left(15);
+
+					ctx.draw_text(Section {
+						text: title,
+						color: text_color.to_rgba(),
+						font_id: ctx.text_renderer.ui_font(),
+						scale: FontScale::uniform(14.0),
+						layout: Layout::default()
+							.v_align(VerticalAlign::Center),
+						..text_bounding_box.to_section_bounds()
+					});
+
+					ctx.bounding_box
+				}
+
+				let tabs_bounding_box = tabs_bg_bounding_box.added_left(10);
+
+				let n: u32 = panes.len().try_into().unwrap();
+
+				let tab_width = u32::min(175, ctx.bounding_box.w / n);
+
+				for (i, pane) in panes.iter_mut().enumerate() {
+					let i: u32 = i.try_into().unwrap();
+					let tab_bounding_box = tabs_bounding_box
+						.added_left(tab_width * i)
+						.with_w(tab_width);
+
+					draw_tab(
+						ctx.with_bounding_box(tab_bounding_box),
+						pane.title(),
+						i == *focused,
+						is_focused,
+					);
+				}
+
+				panes[*focused as usize].draw(
+					ctx.with_bounding_box(
+						ctx.bounding_box.added_top(tabs_bg_bounding_box.h),
+					),
+					is_focused,
+				);
 			}
-			_ => unimplemented!(),
+			Panes::Single(pane) => {
+				pane.draw(ctx.reborrow(), ());
+			}
 		}
+		ctx.bounding_box
+	}
+}
+
+impl Drawable for Pane {
+	type UserData = ();
+
+	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> BoundingBox {
+		ctx.draw_solid_rect(ctx.bounding_box, ctx.config.editor_colors.bg);
 		ctx.bounding_box
 	}
 }

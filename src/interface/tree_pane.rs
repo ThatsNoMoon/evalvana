@@ -6,24 +6,10 @@ pub struct TreePane {
 	pub evaluators: Evaluators,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PaneStatuses {
-	VerticalSplit(PaneStatusList),
-	HorizontalSplit(PaneStatusList),
-	Tabbed(PaneStatusList),
-	Single(PaneStatus),
-}
-
-impl Default for PaneStatuses {
-	fn default() -> PaneStatuses {
-		PaneStatuses::Tabbed(PaneStatusList::default())
-	}
-}
-
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PaneStatusList {
-	pub pane_statuses: Vec<PaneStatuses>,
-	pub focused: Option<usize>,
+pub struct PaneStatuses {
+	pub pane_statuses: Vec<PaneStatus>,
+	pub focused: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

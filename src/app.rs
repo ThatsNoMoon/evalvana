@@ -1,4 +1,5 @@
 use crate::config::{Config, EditorColors, UiColors};
+use crate::icons::Icons;
 use crate::interface::Interface;
 use crate::renderer::{color::Color, Renderer};
 
@@ -10,29 +11,13 @@ use winit::{
 	window::{Icon, Window, WindowBuilder},
 };
 
-const ICON16: &'static [u8] = include_bytes!(concat!(
-	env!("CARGO_MANIFEST_DIR"),
-	"/assets/icons/logo_16.png"
-));
-const ICON32: &'static [u8] = include_bytes!(concat!(
-	env!("CARGO_MANIFEST_DIR"),
-	"/assets/icons/logo_32.png"
-));
-const ICON64: &'static [u8] = include_bytes!(concat!(
-	env!("CARGO_MANIFEST_DIR"),
-	"/assets/icons/logo_64.png"
-));
-const ICON128: &'static [u8] = include_bytes!(concat!(
-	env!("CARGO_MANIFEST_DIR"),
-	"/assets/icons/logo_128.png"
-));
-
 pub struct App {
 	window: Window,
 	event_loop: EventLoop<()>,
 	renderer: Renderer,
 	interface: Interface,
 	config: Config,
+	icons: Icons,
 }
 
 impl App {
@@ -41,7 +26,10 @@ impl App {
 			ui_colors: UiColors {
 				bg: Color::from_rgb_u32(0x282C34),
 				secondary_bg: Color::from_rgb_u32(0x1D2026),
-				text: Color::from_rgb_u32(0xABB2BF),
+				focused_bg: Color::from_rgb_u32(0x333842),
+				unfocused_bg: Color::from_rgb_u32(0x1D2026),
+				text: Color::from_rgb_u32(0xC1C8D6),
+				unfocused_text: Color::from_rgb_u32(0x8C919C),
 				accent: Color::from_rgb_u32(0x61AFEF),
 				borders: Color::from_rgb_u32(0x4B5263),
 			},
@@ -60,6 +48,8 @@ impl App {
 			},
 		};
 
+		let icons = Icons::default();
+
 		let event_loop = EventLoop::new();
 
 		let window = WindowBuilder::new()
@@ -69,11 +59,77 @@ impl App {
 			.build(&event_loop)
 			.unwrap();
 
-		App::set_scaled_icon(&window, 1.0);
+		App::set_scaled_icon(&window, &icons);
 
 		let renderer = Renderer::new(&window);
 
-		let interface = Interface::default();
+		let mut interface = Interface::default();
+
+		{
+			use crate::interface::*;
+
+			let pane1 = Pane::new("Some REPL".to_string());
+			let pane2 = Pane::new("Another REPL".to_string());
+			let pane3 = Pane::new("Third REPL".to_string());
+			let pane4 = Pane::new("Fourth REPL".to_string());
+			let pane5 = Pane::new("Fifth REPL".to_string());
+			let pane6 = Pane::new("Sixth REPL".to_string());
+
+			interface.tree_pane.pane_statuses = PaneStatuses {
+				focused: 1,
+				pane_statuses: vec![
+					PaneStatus::of_pane(&pane1),
+					PaneStatus::of_pane(&pane2),
+					PaneStatus::of_pane(&pane3),
+					PaneStatus::of_pane(&pane4),
+					PaneStatus::of_pane(&pane5),
+					PaneStatus::of_pane(&pane6),
+				],
+			};
+
+			interface.tree_pane.evaluators = Evaluators {
+				evaluators: vec![
+					Evaluator {
+						name: "Rust".to_string(),
+					},
+					Evaluator {
+						name: "Lua".to_string(),
+					},
+					Evaluator {
+						name: "TypeScript".to_string(),
+					},
+				],
+			};
+
+			interface.panes = Panes::VerticalSplit(PaneList {
+				focused: 0,
+				panes: vec![
+					Panes::Tabbed(PaneList {
+						focused: 1,
+						panes: vec![Panes::Single(pane1), Panes::Single(pane2)],
+					}),
+					Panes::HorizontalSplit(PaneList {
+						focused: 0,
+						panes: vec![
+							Panes::Tabbed(PaneList {
+								focused: 0,
+								panes: vec![
+									Panes::Single(pane3),
+									Panes::Single(pane4),
+								],
+							}),
+							Panes::Tabbed(PaneList {
+								focused: 1,
+								panes: vec![
+									Panes::Single(pane5),
+									Panes::Single(pane6),
+								],
+							}),
+						],
+					}),
+				],
+			});
+		}
 
 		App {
 			window,
@@ -81,6 +137,7 @@ impl App {
 			renderer,
 			interface,
 			config,
+			icons,
 		}
 	}
 
@@ -91,7 +148,7 @@ impl App {
 			mut renderer,
 			mut interface,
 			config,
-			..
+			mut icons,
 		} = self;
 		event_loop.run(move |event, _, control_flow| {
 			*control_flow = ControlFlow::Poll;
@@ -110,7 +167,8 @@ impl App {
 					event: WindowEvent::ScaleFactorChanged { scale_factor, .. },
 					..
 				} => {
-					App::set_scaled_icon(&window, scale_factor);
+					icons.set_scale_factor(scale_factor);
+					App::set_scaled_icon(&window, &icons);
 				}
 
 				Event::RedrawRequested(_) => {
@@ -126,43 +184,14 @@ impl App {
 		});
 	}
 
-	fn set_scaled_icon(window: &Window, scale_factor: f64) {
-		fn icon_from_bytes(icon_bytes: &[u8]) -> Icon {
-			let logo_decoder = PngDecoder::new(icon_bytes).unwrap();
-			let (logo_w, logo_h) = logo_decoder.dimensions();
-			let mut logo_pixels = vec![0; logo_decoder.total_bytes() as usize];
-			logo_decoder.read_image(logo_pixels.as_mut_slice()).unwrap();
-
-			Icon::from_rgba(logo_pixels, logo_w, logo_h).unwrap()
-		}
-
-		let icon_bytes = match (scale_factor.ceil() as u8)
-			.checked_next_power_of_two()
-			.unwrap_or_else(|| panic!("Invalid scale factor {}", scale_factor))
-		{
-			1 => ICON16,
-			2 => ICON32,
-			4 => ICON64,
-			_ => ICON128,
-		};
-
-		window.set_window_icon(Some(icon_from_bytes(icon_bytes)));
+	fn set_scaled_icon(window: &Window, icons: &Icons) {
+		window.set_window_icon(Some(icons.create_window_icon()));
 
 		#[cfg(target_os = "windows")]
 		{
 			use winit::platform::windows::WindowExtWindows;
 
-			let large_icon_bytes = match (scale_factor.ceil() as u8)
-				.checked_next_power_of_two()
-				.unwrap_or_else(|| {
-					panic!("Invalid scale factor {}", scale_factor)
-				}) {
-				1 => ICON32,
-				2 => ICON64,
-				_ => ICON128,
-			};
-
-			window.set_taskbar_icon(Some(icon_from_bytes(large_icon_bytes)));
+			window.set_taskbar_icon(Some(icons.create_taskbar_icon()));
 		}
 	}
 }
