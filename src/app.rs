@@ -8,6 +8,7 @@ use winit::{
 	dpi::LogicalSize,
 	event::{Event, WindowEvent},
 	event_loop::{ControlFlow, EventLoop},
+	monitor::MonitorHandle,
 	window::{Icon, Window, WindowBuilder},
 };
 
@@ -150,6 +151,10 @@ impl App {
 			config,
 			mut icons,
 		} = self;
+
+		let mut monitor = window.current_monitor();
+		let mut delta = App::target_delta(&monitor);
+
 		event_loop.run(move |event, _, control_flow| {
 			*control_flow = ControlFlow::Poll;
 
@@ -162,7 +167,15 @@ impl App {
 				} => {
 					renderer.resize(size);
 				}
-
+				Event::WindowEvent {
+					event: WindowEvent::Moved(_),
+					..
+				} => {
+					if window.current_monitor() != monitor {
+						monitor = window.current_monitor();
+						delta = App::target_delta(&monitor);
+					}
+				}
 				Event::WindowEvent {
 					event: WindowEvent::ScaleFactorChanged { scale_factor, .. },
 					..
@@ -182,6 +195,16 @@ impl App {
 				_ => (),
 			}
 		});
+	}
+
+	fn target_delta(monitor: &MonitorHandle) -> u16 {
+		monitor
+			.video_modes()
+			.map(|video_mode| video_mode.refresh_rate())
+			.max()
+			.map_or(16, |refresh_rate| {
+				(1000.0 / refresh_rate as f32).floor() as u16
+			})
 	}
 
 	fn set_scaled_icon(window: &Window, icons: &Icons) {
