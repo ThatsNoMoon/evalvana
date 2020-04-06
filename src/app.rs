@@ -3,6 +3,8 @@ use crate::icons::Icons;
 use crate::interface::Interface;
 use crate::renderer::{color::Color, Renderer};
 
+use std::time::{Duration, Instant};
+
 use image::{png::PngDecoder, ImageDecoder};
 use winit::{
 	dpi::LogicalSize,
@@ -156,7 +158,9 @@ impl App {
 		let mut delta = App::target_delta(&monitor);
 
 		event_loop.run(move |event, _, control_flow| {
-			*control_flow = ControlFlow::Poll;
+			*control_flow = ControlFlow::WaitUntil(
+				Instant::now() + Duration::from_millis(delta as u64),
+			);
 
 			match event {
 				Event::MainEventsCleared => window.request_redraw(),
