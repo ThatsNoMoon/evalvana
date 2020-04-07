@@ -1,8 +1,6 @@
 use std::fs;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-	println!("cargo:rerun-if-changed=assets/shaders");
-
 	fs::create_dir_all("target/shaders/")?;
 
 	let mut compiler = shaderc::Compiler::new().unwrap();
@@ -29,6 +27,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 							input_path
 						)
 				})?;
+
+			println!("cargo:rerun-if-changed={:?}", input_path);
 
 			let source = fs::read_to_string(&input_path)?;
 			let artifact = compiler.compile_into_spirv(

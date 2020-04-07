@@ -64,7 +64,7 @@ impl App {
 
 		App::set_scaled_icon(&window, &icons);
 
-		let renderer = Renderer::new(&window);
+		let renderer = Renderer::new(&window, &icons);
 
 		let mut interface = Interface::default();
 
@@ -189,7 +189,7 @@ impl App {
 				}
 
 				Event::RedrawRequested(_) => {
-					renderer.redraw(&window, &config, &mut interface);
+					renderer.redraw(&window, &config, &icons, &mut interface);
 				}
 
 				Event::WindowEvent {

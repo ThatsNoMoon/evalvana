@@ -1,16 +1,19 @@
 use super::{
-	bounding_box::BoundingBox, color::Color, point, text::TextRenderer, Point,
-	Vertex, VertexIndex,
+	bounding_box::BoundingBox, color::Color, text::TextRenderer, Point,
+	TextureVertex, Vertex, VertexIndex,
 };
 
-use crate::config::Config;
-use crate::interface::{
-	Evaluator, Evaluators, Interface, Pane, PaneList, PaneStatus, PaneStatuses,
-	Panes, TreePane,
-};
-use crate::repl::evaluation::{
-	CompoundResult, EditedExpression, Evaluation, Expression, PlainResult,
-	Result as EvaluationResult,
+use crate::{
+	config::Config,
+	icons::{IconDescriptor, IconType, Icons},
+	interface::{
+		Evaluator, Evaluators, Interface, Pane, PaneList, PaneStatus,
+		PaneStatuses, Panes, TreePane,
+	},
+	repl::evaluation::{
+		CompoundResult, EditedExpression, Evaluation, Expression, PlainResult,
+		Result as EvaluationResult,
+	},
 };
 
 use std::borrow::Cow;
@@ -25,8 +28,11 @@ pub struct DrawingContext<'a> {
 	bounding_box: BoundingBox,
 	window: &'a Window,
 	config: &'a Config,
-	vertex_buffer: &'a mut Vec<Vertex>,
-	index_buffer: &'a mut Vec<VertexIndex>,
+	icons: &'a Icons,
+	color_vertex_buffer: &'a mut Vec<Vertex>,
+	color_index_buffer: &'a mut Vec<VertexIndex>,
+	texture_vertex_buffer: &'a mut Vec<TextureVertex>,
+	texture_index_buffer: &'a mut Vec<VertexIndex>,
 	text_renderer: &'a mut TextRenderer,
 }
 
@@ -34,8 +40,11 @@ impl<'a> DrawingContext<'a> {
 	pub fn new(
 		window: &'a Window,
 		config: &'a Config,
-		vertex_buffer: &'a mut Vec<Vertex>,
-		index_buffer: &'a mut Vec<VertexIndex>,
+		icons: &'a Icons,
+		color_vertex_buffer: &'a mut Vec<Vertex>,
+		color_index_buffer: &'a mut Vec<VertexIndex>,
+		texture_vertex_buffer: &'a mut Vec<TextureVertex>,
+		texture_index_buffer: &'a mut Vec<VertexIndex>,
 		text_renderer: &'a mut TextRenderer,
 	) -> DrawingContext<'a> {
 		let LogicalSize { width, height } =
@@ -44,8 +53,11 @@ impl<'a> DrawingContext<'a> {
 			bounding_box: BoundingBox::new(0, 0, width, height),
 			window,
 			config,
-			vertex_buffer,
-			index_buffer,
+			icons,
+			color_vertex_buffer,
+			color_index_buffer,
+			texture_vertex_buffer,
+			texture_index_buffer,
 			text_renderer,
 		}
 	}
@@ -58,8 +70,11 @@ impl<'a> DrawingContext<'a> {
 			bounding_box,
 			window: self.window,
 			config: self.config,
-			vertex_buffer: self.vertex_buffer,
-			index_buffer: self.index_buffer,
+			icons: self.icons,
+			color_vertex_buffer: self.color_vertex_buffer,
+			color_index_buffer: self.color_index_buffer,
+			texture_vertex_buffer: self.texture_vertex_buffer,
+			texture_index_buffer: self.texture_index_buffer,
 			text_renderer: self.text_renderer,
 		}
 	}
@@ -69,8 +84,11 @@ impl<'a> DrawingContext<'a> {
 			bounding_box: self.bounding_box,
 			window: self.window,
 			config: self.config,
-			vertex_buffer: self.vertex_buffer,
-			index_buffer: self.index_buffer,
+			icons: self.icons,
+			color_vertex_buffer: self.color_vertex_buffer,
+			color_index_buffer: self.color_index_buffer,
+			texture_vertex_buffer: self.texture_vertex_buffer,
+			texture_index_buffer: self.texture_index_buffer,
 			text_renderer: self.text_renderer,
 		}
 	}
@@ -84,11 +102,11 @@ impl<'a> DrawingContext<'a> {
 			.inner_size()
 			.to_logical(self.window.scale_factor());
 		let start_idx: u16 = self
-			.vertex_buffer
+			.color_vertex_buffer
 			.len()
 			.try_into()
 			.expect("More than u16::MAX vertices");
-		self.vertex_buffer.extend_from_slice(&[
+		self.color_vertex_buffer.extend_from_slice(&[
 			Vertex::new(
 				pixel_to_clip(bounding_box.x, bounding_box.y, w, h),
 				color,
@@ -122,7 +140,82 @@ impl<'a> DrawingContext<'a> {
 			),
 		]);
 
-		self.index_buffer.extend_from_slice(&[
+		self.color_index_buffer.extend_from_slice(&[
+			0 + start_idx,
+			1 + start_idx,
+			2 + start_idx,
+			0 + start_idx,
+			3 + start_idx,
+			2 + start_idx,
+		]);
+	}
+
+	fn draw_icon_rect(&mut self, bounding_box: BoundingBox, icon: IconType) {
+		let LogicalSize {
+			width: w,
+			height: h,
+		} = self
+			.window
+			.inner_size()
+			.to_logical(self.window.scale_factor());
+		let start_idx: u16 = self
+			.texture_vertex_buffer
+			.len()
+			.try_into()
+			.expect("More than u16::MAX vertices");
+
+		let IconDescriptor {
+			size: (icon_w, icon_h),
+			atlas_location: (icon_x, icon_y),
+		} = self.icons.get_icon_descriptor(icon);
+
+		let (atlas_w, atlas_h) = self.icons.texture_atlas_size();
+		let (atlas_w, atlas_h) = (atlas_w as f32, atlas_h as f32);
+
+		self.texture_vertex_buffer.extend_from_slice(&[
+			TextureVertex::new(
+				pixel_to_clip(bounding_box.x, bounding_box.y, w, h),
+				Point::new(icon_x as f32, icon_y as f32),
+			),
+			TextureVertex::new(
+				pixel_to_clip(
+					bounding_box.x + bounding_box.w,
+					bounding_box.y,
+					w,
+					h,
+				),
+				Point::new(
+					(icon_x + icon_w - 1) as f32 / atlas_w,
+					icon_y as f32 / atlas_h,
+				),
+			),
+			TextureVertex::new(
+				pixel_to_clip(
+					bounding_box.x + bounding_box.w,
+					bounding_box.y + bounding_box.h,
+					w,
+					h,
+				),
+				Point::new(
+					(icon_x + icon_w - 1) as f32 / atlas_w,
+					(icon_y + icon_h - 1) as f32 / atlas_h,
+				),
+			),
+			TextureVertex::new(
+				pixel_to_clip(
+					bounding_box.x,
+					bounding_box.y + bounding_box.h,
+					w,
+					h,
+				),
+				Point::new(
+					icon_x as f32 / atlas_w,
+					(icon_y + icon_h - 1) as f32 / atlas_h,
+				),
+			),
+		]);
+
+		self.texture_index_buffer.extend_from_slice(&[
 			0 + start_idx,
 			1 + start_idx,
 			2 + start_idx,
@@ -272,7 +365,8 @@ impl Drawable for PaneStatus {
 		let text_bounding_box = ctx
 			.bounding_box
 			.added_left(20)
-			.added_y(ctx.bounding_box.h / 2);
+			.added_y(ctx.bounding_box.h / 2)
+			.added_right(ctx.bounding_box.h);
 		ctx.draw_text(Section {
 			text: self.name.as_str(),
 			color: ctx.config.ui_colors.text.to_rgba(),
@@ -280,6 +374,19 @@ impl Drawable for PaneStatus {
 			layout: Layout::default().v_align(VerticalAlign::Center),
 			..text_bounding_box.to_section_bounds()
 		});
+
+		let icon_margin = u32::max(2, ctx.bounding_box.h / 5);
+		let icon_bounding_box = ctx
+			.bounding_box
+			.with_w(ctx.bounding_box.h)
+			.added_x(ctx.bounding_box.w - ctx.bounding_box.h)
+			.added_left(icon_margin)
+			.subbed_right(icon_margin)
+			.added_top(icon_margin)
+			.subbed_bottom(icon_margin);
+
+		ctx.draw_icon_rect(icon_bounding_box, IconType::Close);
+
 		ctx.bounding_box
 	}
 }
@@ -452,8 +559,10 @@ impl Drawable for Panes {
 
 					ctx.draw_solid_rect(bounding_box, bg_color);
 
-					let text_bounding_box =
-						bounding_box.added_y(bounding_box.h / 2).added_left(15);
+					let text_bounding_box = bounding_box
+						.added_y(bounding_box.h / 2)
+						.added_left(15)
+						.added_right(14);
 
 					ctx.draw_text(Section {
 						text: title,
@@ -464,6 +573,17 @@ impl Drawable for Panes {
 							.v_align(VerticalAlign::Center),
 						..text_bounding_box.to_section_bounds()
 					});
+
+					let icon_margin = bounding_box.h / 4;
+
+					let icon_bounding_box = bounding_box
+						.added_left(bounding_box.w - bounding_box.h)
+						.added_top(icon_margin)
+						.subbed_bottom(icon_margin)
+						.added_left(icon_margin)
+						.subbed_right(icon_margin);
+
+					ctx.draw_icon_rect(icon_bounding_box, IconType::Close);
 
 					ctx.bounding_box
 				}
@@ -513,7 +633,7 @@ impl Drawable for Pane {
 }
 
 fn pixel_to_clip(x: u32, y: u32, w: u32, h: u32) -> Point {
-	point(
+	Point::new(
 		(x as f32 / (w as f32) - 0.5) * 2.0,
 		(y as f32 / (h as f32) - 0.5) * 2.0,
 	)
