@@ -4,17 +4,18 @@ use color::Color;
 mod pipelines;
 use pipelines::Pipelines;
 
-mod bounding_box;
-
 pub mod text;
 use text::TextRenderer;
 
 mod drawable;
 use drawable::{Drawable, DrawingContext};
 
-use crate::config::Config;
-use crate::icons::Icons;
-use crate::interface::Interface;
+use crate::{
+	config::Config,
+	geometry::{ScreenNormPoint, TexNormPoint},
+	icons::Icons,
+	interface::Interface,
+};
 
 use std::time::Instant;
 
@@ -38,7 +39,7 @@ pub struct Renderer {
 
 	text_renderer: TextRenderer,
 
-	color_vertices: Option<Vec<Vertex>>,
+	color_vertices: Option<Vec<ColorVertex>>,
 	color_indices: Option<Vec<VertexIndex>>,
 	color_vertex_buffer: wgpu::Buffer,
 	color_index_buffer: wgpu::Buffer,
@@ -94,7 +95,7 @@ impl Renderer {
 		let color_vertex_buffer =
 			device.create_buffer(&wgpu::BufferDescriptor {
 				size: 500
-					* std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
+					* std::mem::size_of::<ColorVertex>() as wgpu::BufferAddress,
 				usage: wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::MAP_WRITE,
 			});
 
@@ -206,7 +207,7 @@ impl Renderer {
 		let n_texture_indices = texture_indices.len() as u32;
 
 		enum ListMessage {
-			ColorVertexList(Vec<Vertex>),
+			ColorVertexList(Vec<ColorVertex>),
 			ColorIndexList(Vec<VertexIndex>),
 			TextureVertexList(Vec<TextureVertex>),
 			TextureIndexList(Vec<VertexIndex>),
@@ -385,41 +386,52 @@ impl Renderer {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, AsBytes, FromBytes)]
-pub struct Point {
-	x: f32,
-	y: f32,
-}
-
-impl Point {
-	pub fn new(x: f32, y: f32) -> Point {
-		Point { x, y }
-	}
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, AsBytes, FromBytes)]
-pub struct Vertex {
-	pos: Point,
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ColorVertex {
+	pos: ScreenNormPoint,
 	color: Color,
 }
 
-impl Vertex {
-	pub fn new(pos: Point, color: Color) -> Vertex {
-		Vertex { pos, color }
+impl ColorVertex {
+	pub fn new(pos: ScreenNormPoint, color: Color) -> ColorVertex {
+		ColorVertex { pos, color }
+	}
+}
+
+unsafe impl AsBytes for ColorVertex {
+	fn only_derive_is_allowed_to_implement_this_trait() {
+		static_assertions::assert_eq_size!(ColorVertex, [f32; 5]);
+	}
+}
+
+unsafe impl FromBytes for ColorVertex {
+	fn only_derive_is_allowed_to_implement_this_trait() {
+		static_assertions::assert_eq_size!(ColorVertex, [f32; 5]);
 	}
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, AsBytes, FromBytes)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TextureVertex {
-	pos: Point,
-	tex_coord: Point,
+	pos: ScreenNormPoint,
+	tex_coord: TexNormPoint,
 }
 
 impl TextureVertex {
-	pub fn new(pos: Point, tex_coord: Point) -> TextureVertex {
+	pub fn new(pos: ScreenNormPoint, tex_coord: TexNormPoint) -> TextureVertex {
 		TextureVertex { pos, tex_coord }
+	}
+}
+
+unsafe impl AsBytes for TextureVertex {
+	fn only_derive_is_allowed_to_implement_this_trait() {
+		static_assertions::assert_eq_size!(TextureVertex, [f32; 4]);
+	}
+}
+
+unsafe impl FromBytes for TextureVertex {
+	fn only_derive_is_allowed_to_implement_this_trait() {
+		static_assertions::assert_eq_size!(TextureVertex, [f32; 4]);
 	}
 }
 

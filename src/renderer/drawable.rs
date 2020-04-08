@@ -1,11 +1,19 @@
 use super::{
-	bounding_box::BoundingBox, color::Color, text::TextRenderer, Point,
-	TextureVertex, Vertex, VertexIndex,
+	color::Color, text::TextRenderer, ColorVertex, TextureVertex, VertexIndex,
 };
 
 use crate::{
 	config::Config,
-	icons::{IconDescriptor, IconType, Icons},
+	geometry::{
+		bounding_box_ext::BoundingBoxExt,
+		ext::{
+			ScreenPixelPointExt, ScreenPixelRectExt, ScreenPixelSizeExt,
+			TexPixelRectExt,
+		},
+		ScreenPixelPoint, ScreenPixelRect, ScreenPixelSize, TexNormPoint,
+		TexNormRect, TexPixelRect,
+	},
+	icons::{IconType, Icons},
 	interface::{
 		Evaluator, Evaluators, Interface, Pane, PaneList, PaneStatus,
 		PaneStatuses, Panes, TreePane,
@@ -25,11 +33,11 @@ use wgpu_glyph::{
 use winit::{dpi::LogicalSize, window::Window};
 
 pub struct DrawingContext<'a> {
-	bounding_box: BoundingBox,
+	bounding_box: ScreenPixelRect,
 	window: &'a Window,
 	config: &'a Config,
 	icons: &'a Icons,
-	color_vertex_buffer: &'a mut Vec<Vertex>,
+	color_vertex_buffer: &'a mut Vec<ColorVertex>,
 	color_index_buffer: &'a mut Vec<VertexIndex>,
 	texture_vertex_buffer: &'a mut Vec<TextureVertex>,
 	texture_index_buffer: &'a mut Vec<VertexIndex>,
@@ -41,16 +49,17 @@ impl<'a> DrawingContext<'a> {
 		window: &'a Window,
 		config: &'a Config,
 		icons: &'a Icons,
-		color_vertex_buffer: &'a mut Vec<Vertex>,
+		color_vertex_buffer: &'a mut Vec<ColorVertex>,
 		color_index_buffer: &'a mut Vec<VertexIndex>,
 		texture_vertex_buffer: &'a mut Vec<TextureVertex>,
 		texture_index_buffer: &'a mut Vec<VertexIndex>,
 		text_renderer: &'a mut TextRenderer,
 	) -> DrawingContext<'a> {
-		let LogicalSize { width, height } =
-			window.inner_size().to_logical(window.scale_factor());
 		DrawingContext {
-			bounding_box: BoundingBox::new(0, 0, width, height),
+			bounding_box: ScreenPixelRect::new(
+				ScreenPixelPoint::zero(),
+				ScreenPixelSize::of_window(window),
+			),
 			window,
 			config,
 			icons,
@@ -64,7 +73,7 @@ impl<'a> DrawingContext<'a> {
 
 	fn with_bounding_box(
 		&mut self,
-		bounding_box: BoundingBox,
+		bounding_box: ScreenPixelRect,
 	) -> DrawingContext<'_> {
 		DrawingContext {
 			bounding_box,
@@ -93,51 +102,24 @@ impl<'a> DrawingContext<'a> {
 		}
 	}
 
-	fn draw_solid_rect(&mut self, bounding_box: BoundingBox, color: Color) {
-		let LogicalSize {
-			width: w,
-			height: h,
-		} = self
+	fn draw_solid_rect(&mut self, bounding_box: ScreenPixelRect, color: Color) {
+		let window_size = self
 			.window
 			.inner_size()
 			.to_logical(self.window.scale_factor());
+
+		let bounding_box = bounding_box.to_norm(window_size);
+
 		let start_idx: u16 = self
 			.color_vertex_buffer
 			.len()
 			.try_into()
 			.expect("More than u16::MAX vertices");
 		self.color_vertex_buffer.extend_from_slice(&[
-			Vertex::new(
-				pixel_to_clip(bounding_box.x, bounding_box.y, w, h),
-				color,
-			),
-			Vertex::new(
-				pixel_to_clip(
-					bounding_box.x + bounding_box.w,
-					bounding_box.y,
-					w,
-					h,
-				),
-				color,
-			),
-			Vertex::new(
-				pixel_to_clip(
-					bounding_box.x + bounding_box.w,
-					bounding_box.y + bounding_box.h,
-					w,
-					h,
-				),
-				color,
-			),
-			Vertex::new(
-				pixel_to_clip(
-					bounding_box.x,
-					bounding_box.y + bounding_box.h,
-					w,
-					h,
-				),
-				color,
-			),
+			ColorVertex::new(bounding_box.top_left(), color),
+			ColorVertex::new(bounding_box.top_right(), color),
+			ColorVertex::new(bounding_box.bottom_right(), color),
+			ColorVertex::new(bounding_box.bottom_left(), color),
 		]);
 
 		self.color_index_buffer.extend_from_slice(&[
@@ -150,11 +132,12 @@ impl<'a> DrawingContext<'a> {
 		]);
 	}
 
-	fn draw_icon_rect(&mut self, bounding_box: BoundingBox, icon: IconType) {
-		let LogicalSize {
-			width: w,
-			height: h,
-		} = self
+	fn draw_icon_rect(
+		&mut self,
+		bounding_box: ScreenPixelRect,
+		icon: IconType,
+	) {
+		let window_size = self
 			.window
 			.inner_size()
 			.to_logical(self.window.scale_factor());
@@ -164,54 +147,24 @@ impl<'a> DrawingContext<'a> {
 			.try_into()
 			.expect("More than u16::MAX vertices");
 
-		let IconDescriptor {
-			size: (icon_w, icon_h),
-			atlas_location: (icon_x, icon_y),
-		} = self.icons.get_icon_descriptor(icon);
+		let bounding_box = bounding_box.to_norm(window_size);
 
-		let (atlas_w, atlas_h) = self.icons.texture_atlas_size();
-		let (atlas_w, atlas_h) = (atlas_w as f32, atlas_h as f32);
+		let icon_rect = self.icons.get_icon_descriptor(icon);
+
+		let atlas_size = self.icons.texture_atlas_size();
+
+		let icon_rect = icon_rect.to_norm(atlas_size);
 
 		self.texture_vertex_buffer.extend_from_slice(&[
+			TextureVertex::new(bounding_box.top_left(), icon_rect.top_left()),
+			TextureVertex::new(bounding_box.top_right(), icon_rect.top_right()),
 			TextureVertex::new(
-				pixel_to_clip(bounding_box.x, bounding_box.y, w, h),
-				Point::new(icon_x as f32, icon_y as f32),
+				bounding_box.bottom_right(),
+				icon_rect.bottom_right(),
 			),
 			TextureVertex::new(
-				pixel_to_clip(
-					bounding_box.x + bounding_box.w,
-					bounding_box.y,
-					w,
-					h,
-				),
-				Point::new(
-					(icon_x + icon_w - 1) as f32 / atlas_w,
-					icon_y as f32 / atlas_h,
-				),
-			),
-			TextureVertex::new(
-				pixel_to_clip(
-					bounding_box.x + bounding_box.w,
-					bounding_box.y + bounding_box.h,
-					w,
-					h,
-				),
-				Point::new(
-					(icon_x + icon_w - 1) as f32 / atlas_w,
-					(icon_y + icon_h - 1) as f32 / atlas_h,
-				),
-			),
-			TextureVertex::new(
-				pixel_to_clip(
-					bounding_box.x,
-					bounding_box.y + bounding_box.h,
-					w,
-					h,
-				),
-				Point::new(
-					icon_x as f32 / atlas_w,
-					(icon_y + icon_h - 1) as f32 / atlas_h,
-				),
+				bounding_box.bottom_left(),
+				icon_rect.bottom_left(),
 			),
 		]);
 
@@ -239,40 +192,40 @@ pub trait Drawable {
 		&mut self,
 		ctx: DrawingContext<'_>,
 		data: Self::UserData,
-	) -> BoundingBox;
+	) -> ScreenPixelRect;
 }
 
 impl Drawable for Interface {
 	type UserData = ();
 
-	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> BoundingBox {
+	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> ScreenPixelRect {
 		let mut tree_bounding_box = ctx.bounding_box.with_w(225);
 		tree_bounding_box = self
 			.tree_pane
 			.draw(ctx.with_bounding_box(tree_bounding_box), ());
 		let mut panes_bounding_box =
-			ctx.bounding_box.added_left(tree_bounding_box.w);
+			ctx.bounding_box.deflate_left(tree_bounding_box.size.width);
 		panes_bounding_box = self
 			.panes
 			.draw(ctx.with_bounding_box(panes_bounding_box), true);
 
-		tree_bounding_box.added_w(panes_bounding_box.w)
+		tree_bounding_box.added_w(panes_bounding_box.size.width)
 	}
 }
 
 impl Drawable for TreePane {
 	type UserData = ();
 
-	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> BoundingBox {
+	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> ScreenPixelRect {
 		ctx.draw_solid_rect(
 			ctx.bounding_box,
 			ctx.config.ui_colors.secondary_bg,
 		);
 
-		let mut current_bounding_box = ctx.bounding_box.added_top(8);
+		let mut current_bounding_box = ctx.bounding_box.deflate_top(8);
 
 		let statuses_title_bounding_box =
-			current_bounding_box.added_left(10).with_h(20);
+			current_bounding_box.deflate_left(10).with_h(20);
 
 		let statuses_title = Section {
 			text: "Open REPLs",
@@ -284,19 +237,19 @@ impl Drawable for TreePane {
 		ctx.draw_text(statuses_title);
 
 		current_bounding_box = current_bounding_box
-			.added_top(statuses_title_bounding_box.h)
-			.added_top(10);
+			.deflate_top(statuses_title_bounding_box.size.height)
+			.deflate_top(10);
 
 		let statuses_bounding_box = self
 			.pane_statuses
 			.draw(ctx.with_bounding_box(current_bounding_box), ());
 
 		current_bounding_box = current_bounding_box
-			.added_top(statuses_bounding_box.h)
-			.added_top(40);
+			.deflate_top(statuses_bounding_box.size.height)
+			.deflate_top(40);
 
 		let evaluators_title_bounding_box =
-			current_bounding_box.with_h(20).added_left(10);
+			current_bounding_box.with_h(20).deflate_left(10);
 
 		let evaluators_title = Section {
 			text: "Available REPLs",
@@ -308,8 +261,8 @@ impl Drawable for TreePane {
 		ctx.draw_text(evaluators_title);
 
 		current_bounding_box = current_bounding_box
-			.added_top(evaluators_title_bounding_box.h)
-			.added_top(10);
+			.deflate_top(evaluators_title_bounding_box.size.height)
+			.deflate_top(10);
 
 		self.evaluators
 			.draw(ctx.with_bounding_box(current_bounding_box), ());
@@ -320,7 +273,7 @@ impl Drawable for TreePane {
 impl Drawable for PaneStatuses {
 	type UserData = ();
 
-	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> BoundingBox {
+	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> ScreenPixelRect {
 		let mut current_bounding_box = ctx.bounding_box;
 		let mut drawn_bounding_box = ctx.bounding_box.with_h(0);
 
@@ -333,18 +286,19 @@ impl Drawable for PaneStatuses {
 				i == self.focused,
 			);
 
-			if drawn_bounding_box.bottom() + inner_bounding_box.h
+			if drawn_bounding_box.bottom() + inner_bounding_box.size.height
 				>= ctx.bounding_box.bottom()
 			{
 				break;
 			}
 
-			current_bounding_box =
-				current_bounding_box.added_top(inner_bounding_box.h);
+			current_bounding_box = current_bounding_box
+				.deflate_top(inner_bounding_box.size.height);
 			drawn_bounding_box =
 				drawn_bounding_box.with_bottom(inner_bounding_box.bottom());
 		}
-		ctx.bounding_box.with_h(drawn_bounding_box.h)
+
+		ctx.bounding_box.with_h(drawn_bounding_box.size.height)
 	}
 }
 
@@ -355,7 +309,7 @@ impl Drawable for PaneStatus {
 		&mut self,
 		mut ctx: DrawingContext<'_>,
 		is_focused: bool,
-	) -> BoundingBox {
+	) -> ScreenPixelRect {
 		if is_focused {
 			ctx.draw_solid_rect(
 				ctx.bounding_box,
@@ -364,9 +318,9 @@ impl Drawable for PaneStatus {
 		}
 		let text_bounding_box = ctx
 			.bounding_box
-			.added_left(20)
-			.added_y(ctx.bounding_box.h / 2)
-			.added_right(ctx.bounding_box.h);
+			.deflate_left(20)
+			.added_y(ctx.bounding_box.size.height / 2)
+			.deflate_right(ctx.bounding_box.size.height);
 		ctx.draw_text(Section {
 			text: self.name.as_str(),
 			color: ctx.config.ui_colors.text.to_rgba(),
@@ -375,15 +329,14 @@ impl Drawable for PaneStatus {
 			..text_bounding_box.to_section_bounds()
 		});
 
-		let icon_margin = u32::max(2, ctx.bounding_box.h / 5);
+		let icon_margin = u32::max(2, ctx.bounding_box.size.height / 5);
 		let icon_bounding_box = ctx
 			.bounding_box
-			.with_w(ctx.bounding_box.h)
-			.added_x(ctx.bounding_box.w - ctx.bounding_box.h)
-			.added_left(icon_margin)
-			.subbed_right(icon_margin)
-			.added_top(icon_margin)
-			.subbed_bottom(icon_margin);
+			.deflate_left(
+				ctx.bounding_box.size.width - ctx.bounding_box.size.height,
+			)
+			.with_w(ctx.bounding_box.size.height)
+			.deflate(icon_margin);
 
 		ctx.draw_icon_rect(icon_bounding_box, IconType::Close);
 
@@ -394,7 +347,7 @@ impl Drawable for PaneStatus {
 impl Drawable for Evaluators {
 	type UserData = ();
 
-	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> BoundingBox {
+	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> ScreenPixelRect {
 		let mut current_bounding_box = ctx.bounding_box;
 		let mut drawn_bounding_box = ctx.bounding_box.with_h(0);
 
@@ -404,31 +357,31 @@ impl Drawable for Evaluators {
 			inner_bounding_box =
 				evaluator.draw(ctx.with_bounding_box(inner_bounding_box), ());
 
-			if drawn_bounding_box.bottom() + inner_bounding_box.h
+			if drawn_bounding_box.bottom() + inner_bounding_box.size.height
 				>= ctx.bounding_box.bottom()
 			{
 				break;
 			}
 
-			current_bounding_box =
-				current_bounding_box.added_top(inner_bounding_box.h);
+			current_bounding_box = current_bounding_box
+				.deflate_top(inner_bounding_box.size.height);
 			drawn_bounding_box =
 				drawn_bounding_box.with_bottom(inner_bounding_box.bottom());
 		}
-		ctx.bounding_box.with_h(drawn_bounding_box.h)
+		ctx.bounding_box.with_h(drawn_bounding_box.size.height)
 	}
 }
 
 impl Drawable for Evaluator {
 	type UserData = ();
 
-	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> BoundingBox {
+	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> ScreenPixelRect {
 		ctx.draw_solid_rect(
 			ctx.bounding_box
-				.added_left(13)
-				.subbed_right(13)
-				.added_top(7)
-				.subbed_bottom(7),
+				.deflate_left(13)
+				.deflate_right(13)
+				.deflate_top(7)
+				.deflate_bottom(7),
 			ctx.config.ui_colors.bg,
 		);
 
@@ -439,9 +392,9 @@ impl Drawable for Evaluator {
 			layout: Layout::default().v_align(VerticalAlign::Center),
 			..ctx
 				.bounding_box
-				.added_left(22)
-				.added_y(ctx.bounding_box.h / 2)
-				.with_h(ctx.bounding_box.h / 3)
+				.deflate_left(22)
+				.added_y(ctx.bounding_box.size.height / 2)
+				.with_h(ctx.bounding_box.size.height / 3)
 				.to_section_bounds()
 		});
 		ctx.bounding_box
@@ -455,7 +408,7 @@ impl Drawable for Panes {
 		&mut self,
 		mut ctx: DrawingContext<'_>,
 		is_focused: bool,
-	) -> BoundingBox {
+	) -> ScreenPixelRect {
 		match self {
 			Panes::VerticalSplit(PaneList { panes, focused }) => {
 				if panes.is_empty() {
@@ -468,7 +421,7 @@ impl Drawable for Panes {
 
 				let n: u32 = panes.len().try_into().unwrap();
 				let inner_bounding_box = {
-					let total_width = ctx.bounding_box.w - 2 * (n - 1);
+					let total_width = ctx.bounding_box.size.width - 2 * (n - 1);
 					let total_width = total_width as f64;
 					let inner_pane_width = total_width / (n as f64);
 					let inner_pane_width = inner_pane_width.ceil() as u32;
@@ -479,14 +432,15 @@ impl Drawable for Panes {
 					let i: u32 = i.try_into().unwrap();
 					pane.draw(
 						ctx.with_bounding_box(
-							inner_bounding_box
-								.added_x((inner_bounding_box.w + 2) * i),
+							inner_bounding_box.added_x(
+								(inner_bounding_box.size.width + 2) * i,
+							),
 						),
 						is_focused && i == *focused,
 					);
 					ctx.draw_solid_rect(
 						inner_bounding_box
-							.added_x(inner_bounding_box.w)
+							.deflate_left(inner_bounding_box.size.width)
 							.with_w(2),
 						ctx.config.ui_colors.borders,
 					);
@@ -504,14 +458,14 @@ impl Drawable for Panes {
 				let n: u32 = panes.len().try_into().unwrap();
 
 				let inner_bounding_box =
-					ctx.bounding_box.with_h(ctx.bounding_box.h / n);
+					ctx.bounding_box.with_h(ctx.bounding_box.size.height / n);
 
 				for (i, pane) in panes.iter_mut().enumerate() {
 					let i: u32 = i.try_into().unwrap();
 					pane.draw(
 						ctx.with_bounding_box(
 							inner_bounding_box
-								.added_y(inner_bounding_box.h * i),
+								.added_y(inner_bounding_box.size.height * i),
 						),
 						is_focused && i == *focused,
 					);
@@ -538,7 +492,7 @@ impl Drawable for Panes {
 					title: &str,
 					tab_focused: bool,
 					parent_focused: bool,
-				) -> BoundingBox {
+				) -> ScreenPixelRect {
 					let bg_color = if tab_focused {
 						ctx.config.editor_colors.bg
 					} else {
@@ -553,16 +507,18 @@ impl Drawable for Panes {
 
 					let bounding_box = ctx
 						.bounding_box
-						.added_top(5)
-						.added_left(5)
-						.subbed_right(5);
+						.deflate_top(5)
+						.deflate_left(5)
+						.deflate_right(5);
 
 					ctx.draw_solid_rect(bounding_box, bg_color);
 
+					let icon_margin = bounding_box.size.height / 4;
+
 					let text_bounding_box = bounding_box
-						.added_y(bounding_box.h / 2)
-						.added_left(15)
-						.added_right(14);
+						.added_y(bounding_box.size.height / 2)
+						.deflate_left(15)
+						.deflate_right(icon_margin);
 
 					ctx.draw_text(Section {
 						text: title,
@@ -574,30 +530,27 @@ impl Drawable for Panes {
 						..text_bounding_box.to_section_bounds()
 					});
 
-					let icon_margin = bounding_box.h / 4;
-
 					let icon_bounding_box = bounding_box
-						.added_left(bounding_box.w - bounding_box.h)
-						.added_top(icon_margin)
-						.subbed_bottom(icon_margin)
-						.added_left(icon_margin)
-						.subbed_right(icon_margin);
+						.deflate_left(
+							bounding_box.size.width - bounding_box.size.height,
+						)
+						.deflate(icon_margin);
 
 					ctx.draw_icon_rect(icon_bounding_box, IconType::Close);
 
 					ctx.bounding_box
 				}
 
-				let tabs_bounding_box = tabs_bg_bounding_box.added_left(10);
+				let tabs_bounding_box = tabs_bg_bounding_box.deflate_left(10);
 
 				let n: u32 = panes.len().try_into().unwrap();
 
-				let tab_width = u32::min(175, ctx.bounding_box.w / n);
+				let tab_width = u32::min(175, ctx.bounding_box.size.width / n);
 
 				for (i, pane) in panes.iter_mut().enumerate() {
 					let i: u32 = i.try_into().unwrap();
 					let tab_bounding_box = tabs_bounding_box
-						.added_left(tab_width * i)
+						.deflate_left(tab_width * i)
 						.with_w(tab_width);
 
 					draw_tab(
@@ -610,7 +563,8 @@ impl Drawable for Panes {
 
 				panes[*focused as usize].draw(
 					ctx.with_bounding_box(
-						ctx.bounding_box.added_top(tabs_bg_bounding_box.h),
+						ctx.bounding_box
+							.deflate_top(tabs_bg_bounding_box.size.height),
 					),
 					is_focused,
 				);
@@ -626,15 +580,8 @@ impl Drawable for Panes {
 impl Drawable for Pane {
 	type UserData = ();
 
-	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> BoundingBox {
+	fn draw(&mut self, mut ctx: DrawingContext<'_>, _: ()) -> ScreenPixelRect {
 		ctx.draw_solid_rect(ctx.bounding_box, ctx.config.editor_colors.bg);
 		ctx.bounding_box
 	}
-}
-
-fn pixel_to_clip(x: u32, y: u32, w: u32, h: u32) -> Point {
-	Point::new(
-		(x as f32 / (w as f32) - 0.5) * 2.0,
-		(y as f32 / (h as f32) - 0.5) * 2.0,
-	)
 }

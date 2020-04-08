@@ -3,12 +3,17 @@ mod ui;
 
 use crate::interface::Theme;
 
+use crate::geometry::{
+	ext::*, TexBytePoint, TexByteSize, TexPixelPoint, TexPixelRect,
+	TexPixelSize,
+};
+
 use std::convert::TryInto;
 
 use image::{error::ImageResult, png::PngDecoder, ImageDecoder};
 use winit::window::Icon as WindowIcon;
 
-pub const BPP: u32 = 4;
+pub const RGBA8_UNORM_BPP: u32 = 4;
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,18 +21,12 @@ pub enum IconType {
 	Close,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct IconDescriptor {
-	pub size: (u32, u32),
-	pub atlas_location: (u32, u32),
-}
-
 pub struct Icons {
 	scale_factor: u8,
 	theme: Theme,
 	atlas: Vec<u8>,
-	atlas_size: (u32, u32),
-	icons: Vec<IconDescriptor>,
+	atlas_size: TexPixelSize,
+	icons: Vec<TexPixelRect>,
 }
 
 impl Default for Icons {
@@ -45,7 +44,7 @@ impl Icons {
 			theme,
 			icons: vec![],
 			atlas: vec![],
-			atlas_size: (0, 0),
+			atlas_size: TexPixelSize::zero(),
 		};
 
 		this.create_atlas();
@@ -61,8 +60,8 @@ impl Icons {
 		let mut icon_data =
 			[ui::close::bytes_for(self.scale_factor, self.theme)];
 
-		icon_data.sort_unstable_by_key(|(_, (width, _))| *width);
-		icon_data.sort_by_key(|(_, (_, height))| *height);
+		icon_data.sort_unstable_by_key(|(_, size)| size.width);
+		icon_data.sort_by_key(|(_, size)| size.height);
 
 		let icon_data: Vec<_> = icon_data
 			.iter()
@@ -70,7 +69,7 @@ impl Icons {
 			.map(|(icon_bytes, size)| {
 				let icon_decoder = PngDecoder::new(icon_bytes).unwrap();
 				let decoded_size = icon_decoder.dimensions();
-				assert_eq!(decoded_size, size);
+				assert_eq!(decoded_size, size.to_tuple());
 				let mut icon_pixels =
 					vec![0; icon_decoder.total_bytes() as usize];
 				icon_decoder.read_image(icon_pixels.as_mut_slice()).unwrap();
@@ -80,85 +79,74 @@ impl Icons {
 
 		let mut icons = Vec::with_capacity(icon_data.len());
 
-		let (atlas_width, atlas_height) = {
-			let (mut atlas_width, mut atlas_height): (u32, u32) =
-				(256 / BPP, 64);
+		let atlas_size = {
+			let mut atlas_size = TexPixelSize::new(256 / RGBA8_UNORM_BPP, 64);
 
 			'outer: loop {
 				icons.clear();
 
 				let mut iter = icon_data.iter();
-				let &(_, (width, height)) = iter.next().unwrap();
-				if height > atlas_height {
-					atlas_height *= 2;
+				let &(_, icon_size) = iter.next().unwrap();
+				if icon_size.height > atlas_size.height {
+					atlas_size.height *= 2;
 					continue 'outer;
 				}
 
-				if width > atlas_width {
-					atlas_width *= 2;
+				if icon_size.width > atlas_size.width {
+					atlas_size.width *= 2;
 					continue 'outer;
 				}
 
-				let (mut atlas_x, mut atlas_y) = (0, 0);
+				let mut atlas_location = TexPixelPoint::zero();
 
-				icons.push(IconDescriptor {
-					size: (width, height),
-					atlas_location: (atlas_x, atlas_y),
-				});
+				icons.push(TexPixelRect::new(atlas_location, icon_size));
 
-				let mut last_height = height;
+				let mut last_height = icon_size.height;
 
-				for &(_, (width, height)) in iter {
-					if height > last_height {
-						if height > atlas_y + atlas_height {
-							atlas_height *= 2;
+				for &(_, icon_size) in iter {
+					if icon_size.height > last_height {
+						if icon_size.height
+							> atlas_location.y + atlas_size.height
+						{
+							atlas_size.height *= 2;
 							continue 'outer;
 						}
 
-						atlas_y += last_height;
-						atlas_x = width;
-						last_height = height;
+						atlas_location.y += last_height;
+						atlas_location.x = icon_size.width;
+						last_height = icon_size.height;
 					}
 
-					if width + atlas_x > atlas_width {
-						atlas_width *= 2;
+					if icon_size.width + atlas_location.x > atlas_size.width {
+						atlas_size.width *= 2;
 						continue 'outer;
 					}
 
-					icons.push(IconDescriptor {
-						size: (width, height),
-						atlas_location: (atlas_x, atlas_y),
-					});
+					icons.push(TexPixelRect::new(atlas_location, icon_size));
 
-					atlas_x += width;
+					atlas_location.x += icon_size.width;
 				}
 
-				break (atlas_width, atlas_height);
+				break atlas_size;
 			}
 		};
 
-		self.atlas =
-			vec![0; (BPP * atlas_width * atlas_height).try_into().unwrap()];
+		self.atlas = vec![0; atlas_size.to_bytes().area().try_into().unwrap()];
 
-		for (icon_descriptor, icon_bytes) in icons
+		for (icon_rect, icon_bytes) in icons
 			.iter()
 			.zip(icon_data.iter().map(|(icon_bytes, _)| icon_bytes))
 		{
-			let &IconDescriptor {
-				size: (width, height),
-				atlas_location: (atlas_x, atlas_y),
-			} = icon_descriptor;
-
 			copy_icon_bytes_to_atlas(
 				icon_bytes.as_slice(),
-				(BPP * width, height),
+				icon_rect.size.to_bytes(),
 				self.atlas.as_mut_slice(),
-				BPP * atlas_width,
-				(BPP * atlas_x, atlas_y),
+				atlas_size.to_bytes(),
+				icon_rect.origin.to_bytes(),
 			);
 		}
 
-		self.atlas_size = (atlas_width, atlas_height);
+		self.atlas_size = atlas_size;
 		self.icons = icons;
 	}
 
@@ -172,7 +160,7 @@ impl Icons {
 		self.create_atlas();
 	}
 
-	pub fn texture_atlas_size(&self) -> (u32, u32) {
+	pub fn texture_atlas_size(&self) -> TexPixelSize {
 		self.atlas_size
 	}
 
@@ -182,11 +170,11 @@ impl Icons {
 		texture: &wgpu::Texture,
 		encoder: &mut wgpu::CommandEncoder,
 	) {
-		let (width, height) = self.atlas_size;
+		let byte_size = self.atlas_size.to_bytes();
 
 		let temp_buf = device
 			.create_buffer_mapped(
-				(BPP * width * height).try_into().unwrap(),
+				byte_size.area().try_into().unwrap(),
 				wgpu::BufferUsage::COPY_SRC,
 			)
 			.fill_from_slice(self.atlas.as_slice());
@@ -195,8 +183,8 @@ impl Icons {
 			wgpu::BufferCopyView {
 				buffer: &temp_buf,
 				offset: 0,
-				row_pitch: BPP * width,
-				image_height: height,
+				row_pitch: byte_size.width,
+				image_height: byte_size.height,
 			},
 			wgpu::TextureCopyView {
 				texture,
@@ -204,15 +192,11 @@ impl Icons {
 				array_layer: 0,
 				origin: wgpu::Origin3d::ZERO,
 			},
-			wgpu::Extent3d {
-				width,
-				height,
-				depth: 1,
-			},
+			self.atlas_size.to_extent(),
 		);
 	}
 
-	pub fn get_icon_descriptor(&self, icon: IconType) -> IconDescriptor {
+	pub fn get_icon_descriptor(&self, icon: IconType) -> TexPixelRect {
 		self.icons[icon as u32 as usize]
 	}
 }
@@ -241,16 +225,16 @@ fn norm_scale_factor(scale_factor: f64) -> u8 {
 
 fn copy_icon_bytes_to_atlas(
 	icon_bytes: &[u8],
-	(icon_width, icon_height): (u32, u32),
+	icon_size: TexByteSize,
 	atlas: &mut [u8],
-	atlas_width: u32,
-	(atlas_x, atlas_y): (u32, u32),
+	atlas_size: TexByteSize,
+	atlas_location: TexBytePoint,
 ) {
-	let icon_width = icon_width.try_into().unwrap();
-	let icon_height = icon_height.try_into().unwrap();
-	let atlas_width = atlas_width.try_into().unwrap();
-	let atlas_x = atlas_x.try_into().unwrap();
-	let atlas_y = atlas_y.try_into().unwrap();
+	let icon_width = icon_size.width.try_into().unwrap();
+	let icon_height = icon_size.height.try_into().unwrap();
+	let atlas_width = atlas_size.width.try_into().unwrap();
+	let atlas_x = atlas_location.x.try_into().unwrap();
+	let atlas_y = atlas_location.y.try_into().unwrap();
 
 	atlas
 		.chunks_exact_mut(atlas_width)

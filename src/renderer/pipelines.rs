@@ -1,8 +1,8 @@
 use super::{
-	Point, TextureVertex, Vertex, VertexIndex, VertexIndexFormat, COLOR_FORMAT,
+	ColorVertex, TextureVertex, VertexIndex, VertexIndexFormat, COLOR_FORMAT,
 };
 
-use crate::icons::BPP;
+use crate::geometry::{ext::TexPixelSizeExt, TexPixelSize};
 
 const TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 
@@ -16,13 +16,10 @@ pub struct Pipelines {
 }
 
 impl Pipelines {
-	pub fn new(
-		device: &wgpu::Device,
-		texture_atlas_size: (u32, u32),
-	) -> Pipelines {
+	pub fn new(device: &wgpu::Device, tex_size: TexPixelSize) -> Pipelines {
 		let (color_pipeline, color_bind_group) = create_color_pipeline(device);
 		let (texture_pipeline, texture_bind_group, texture_atlas) =
-			create_texture_pipeline(device, texture_atlas_size);
+			create_texture_pipeline(device, tex_size);
 
 		Pipelines {
 			color_pipeline,
@@ -122,17 +119,18 @@ fn create_color_pipeline(
 			depth_stencil_state: None,
 			index_format: VertexIndex::WGPU_FORMAT,
 			vertex_buffers: &[wgpu::VertexBufferDescriptor {
-				stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
+				stride: std::mem::size_of::<ColorVertex>()
+					as wgpu::BufferAddress,
 				step_mode: wgpu::InputStepMode::Vertex,
 				attributes: &[
 					wgpu::VertexAttributeDescriptor {
-						offset: memoffset::offset_of!(Vertex, pos)
+						offset: memoffset::offset_of!(ColorVertex, pos)
 							as wgpu::BufferAddress,
 						format: wgpu::VertexFormat::Float2,
 						shader_location: 0,
 					},
 					wgpu::VertexAttributeDescriptor {
-						offset: memoffset::offset_of!(Vertex, color)
+						offset: memoffset::offset_of!(ColorVertex, color)
 							as wgpu::BufferAddress,
 						format: wgpu::VertexFormat::Float3,
 						shader_location: 1,
@@ -149,7 +147,7 @@ fn create_color_pipeline(
 
 fn create_texture_pipeline(
 	device: &wgpu::Device,
-	(texture_width, texture_height): (u32, u32),
+	tex_size: TexPixelSize,
 ) -> (wgpu::RenderPipeline, wgpu::BindGroup, wgpu::Texture) {
 	let vs = include_bytes!(concat!(
 		env!("CARGO_MANIFEST_DIR"),
@@ -187,11 +185,7 @@ fn create_texture_pipeline(
 		});
 
 	let texture = device.create_texture(&wgpu::TextureDescriptor {
-		size: wgpu::Extent3d {
-			width: texture_width,
-			height: texture_height,
-			depth: 1,
-		},
+		size: tex_size.to_extent(),
 		sample_count: 1,
 		array_layer_count: 1,
 		mip_level_count: 1,
