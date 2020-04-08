@@ -1,9 +1,25 @@
 use std::fs;
 
+use shaderc::{CompileOptions, Compiler, OptimizationLevel, ShaderKind};
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	fs::create_dir_all("target/shaders/")?;
 
-	let mut compiler = shaderc::Compiler::new().unwrap();
+	let mut compiler = Compiler::new().unwrap();
+
+	let options = match std::env::var("PROFILE").unwrap().as_str() {
+		"release" => {
+			let mut options = CompileOptions::new().unwrap();
+			options.set_optimization_level(OptimizationLevel::Performance);
+			Some(options)
+		}
+		"debug" => {
+			let mut options = CompileOptions::new().unwrap();
+			options.set_optimization_level(OptimizationLevel::Zero);
+			Some(options)
+		}
+		_ => None,
+	};
 
 	for entry in fs::read_dir("assets/shaders")? {
 		let entry = entry?;
@@ -17,8 +33,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			let shader_kind = input_path
 				.extension()
 				.and_then(|ext| match ext.to_string_lossy().as_ref() {
-					"vert" => Some(shaderc::ShaderKind::Vertex),
-					"frag" => Some(shaderc::ShaderKind::Fragment),
+					"vert" => Some(ShaderKind::Vertex),
+					"frag" => Some(ShaderKind::Fragment),
 					_ => None,
 				})
 				.ok_or_else(|| {
@@ -36,7 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				shader_kind,
 				&input_name,
 				"main",
-				None,
+				options.as_ref(),
 			)?;
 
 			if artifact.get_num_warnings() > 0 {
