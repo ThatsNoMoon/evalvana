@@ -393,6 +393,7 @@ pub struct ColorVertex {
 }
 
 impl ColorVertex {
+	#[inline(always)]
 	pub fn new(pos: ScreenNormPoint, color: Color) -> ColorVertex {
 		ColorVertex { pos, color }
 	}
@@ -418,6 +419,7 @@ pub struct TextureVertex {
 }
 
 impl TextureVertex {
+	#[inline(always)]
 	pub fn new(pos: ScreenNormPoint, tex_coord: TexNormPoint) -> TextureVertex {
 		TextureVertex { pos, tex_coord }
 	}

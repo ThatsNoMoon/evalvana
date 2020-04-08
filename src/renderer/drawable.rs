@@ -71,6 +71,7 @@ impl<'a> DrawingContext<'a> {
 		}
 	}
 
+	#[inline]
 	fn with_bounding_box(
 		&mut self,
 		bounding_box: ScreenPixelRect,
@@ -88,6 +89,7 @@ impl<'a> DrawingContext<'a> {
 		}
 	}
 
+	#[inline]
 	fn reborrow(&mut self) -> DrawingContext<'_> {
 		DrawingContext {
 			bounding_box: self.bounding_box,

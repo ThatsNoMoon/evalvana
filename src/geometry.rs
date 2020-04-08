@@ -91,28 +91,36 @@ pub mod bounding_box_ext {
 			+ NumCast
 			+ Copy,
 	{
+		#[inline(always)]
 		fn top(&self) -> T {
 			self.origin.y
 		}
+		#[inline(always)]
 		fn bottom(&self) -> T {
 			self.origin.y + self.size.height
 		}
+		#[inline(always)]
 		fn left(&self) -> T {
 			self.origin.x
 		}
+		#[inline(always)]
 		fn right(&self) -> T {
 			self.origin.x + self.size.width
 		}
 
+		#[inline(always)]
 		fn top_left(&self) -> Point2D<T, S> {
 			self.origin
 		}
+		#[inline(always)]
 		fn bottom_left(&self) -> Point2D<T, S> {
 			Point2D::new(self.origin.x, self.origin.y + self.size.height)
 		}
+		#[inline(always)]
 		fn top_right(&self) -> Point2D<T, S> {
 			Point2D::new(self.origin.x + self.size.width, self.origin.y)
 		}
+		#[inline(always)]
 		fn bottom_right(&self) -> Point2D<T, S> {
 			Point2D::new(
 				self.origin.x + self.size.width,
@@ -120,34 +128,41 @@ pub mod bounding_box_ext {
 			)
 		}
 
+		#[inline(always)]
 		fn with_size(mut self, size: Size2D<T, S>) -> Self {
 			self.size = size;
 			self
 		}
+		#[inline(always)]
 		fn with_origin(mut self, origin: Point2D<T, S>) -> Self {
 			self.origin = origin;
 			self
 		}
 
+		#[inline(always)]
 		fn inflate_top(mut self, t: T) -> Self {
 			self.origin.y -= t;
 			self.size.height += t;
 			self
 		}
+		#[inline(always)]
 		fn inflate_bottom(mut self, t: T) -> Self {
 			self.size.height += t;
 			self
 		}
+		#[inline(always)]
 		fn inflate_left(mut self, t: T) -> Self {
 			self.origin.x -= t;
 			self.size.width += t;
 			self
 		}
+		#[inline(always)]
 		fn inflate_right(mut self, t: T) -> Self {
 			self.size.width += t;
 			self
 		}
 
+		#[inline]
 		fn deflate(mut self, t: T) -> Self {
 			self.origin.x += t;
 			self.origin.y += t;
@@ -159,55 +174,67 @@ pub mod bounding_box_ext {
 			self
 		}
 
+		#[inline(always)]
 		fn deflate_top(mut self, t: T) -> Self {
 			self.origin.y += t;
 			self.size.height -= t;
 			self
 		}
+		#[inline(always)]
 		fn deflate_bottom(mut self, t: T) -> Self {
 			self.size.height -= t;
 			self
 		}
+		#[inline(always)]
 		fn deflate_left(mut self, t: T) -> Self {
 			self.origin.x += t;
 			self.size.width -= t;
 			self
 		}
+		#[inline(always)]
 		fn deflate_right(mut self, t: T) -> Self {
 			self.size.width -= t;
 			self
 		}
 
+		#[inline(always)]
 		fn with_h(mut self, h: T) -> Self {
 			self.size.height = h;
 			self
 		}
+		#[inline(always)]
 		fn with_w(mut self, w: T) -> Self {
 			self.size.width = w;
 			self
 		}
 
+		#[inline(always)]
 		fn added_x(mut self, x: T) -> Self {
 			self.origin.x += x;
 			self
 		}
+		#[inline(always)]
 		fn added_y(mut self, y: T) -> Self {
 			self.origin.y += y;
 			self
 		}
+		#[inline(always)]
 		fn added_w(mut self, w: T) -> Self {
 			self.size.width += w;
 			self
 		}
+		#[inline(always)]
 		fn added_h(mut self, h: T) -> Self {
 			self.size.height += h;
 			self
 		}
 
+		#[inline(always)]
 		fn with_bottom(mut self, bottom: T) -> Self {
 			self.size.height = bottom - self.origin.y;
 			self
 		}
+		#[inline]
 		fn with_top(mut self, top: T) -> Self {
 			if top > self.origin.y {
 				self.size.height -= top - self.origin.y;
@@ -218,6 +245,7 @@ pub mod bounding_box_ext {
 			self.origin.y = top;
 			self
 		}
+		#[inline]
 		fn with_left(mut self, left: T) -> Self {
 			if left > self.origin.x {
 				self.size.width -= left - self.origin.x;
@@ -228,11 +256,13 @@ pub mod bounding_box_ext {
 			self.origin.x = left;
 			self
 		}
+		#[inline(always)]
 		fn with_right(mut self, right: T) -> Self {
 			self.size.width = right - self.origin.x;
 			self
 		}
 
+		#[inline]
 		fn to_section_bounds(self) -> Section<'static> {
 			let this = self.to_f32();
 			Section {
@@ -260,6 +290,7 @@ pub mod ext {
 	}
 
 	impl ScreenPixelPointExt for ScreenPixelPoint {
+		#[inline]
 		fn to_norm(self, window_size: LogicalSize<u32>) -> ScreenNormPoint {
 			let window_size: LogicalSize<f32> = window_size.cast();
 			let this: Point2D<f32, ScreenPixelSpace> = self.cast();
@@ -276,6 +307,7 @@ pub mod ext {
 	}
 
 	impl ScreenPhysicalPointExt for ScreenPhysicalPoint {
+		#[inline]
 		fn to_logical(self, scale_factor: f64) -> ScreenPixelPoint {
 			let size = LogicalSize::from_physical(
 				PhysicalSize::new(self.x, self.y),
@@ -291,11 +323,13 @@ pub mod ext {
 	}
 
 	impl ScreenPixelSizeExt for ScreenPixelSize {
+		#[inline]
 		fn of_window(window: &Window) -> Self {
 			let LogicalSize { width, height } =
 				window.inner_size().to_logical(window.scale_factor());
 			ScreenPixelSize::new(width, height)
 		}
+		#[inline]
 		fn to_norm(self, window: LogicalSize<u32>) -> ScreenNormSize {
 			let window: LogicalSize<f32> = window.cast();
 			let this: Size2D<f32, ScreenPixelSpace> = self.cast();
@@ -311,6 +345,7 @@ pub mod ext {
 	}
 
 	impl ScreenPhysicalSizeExt for ScreenPhysicalSize {
+		#[inline]
 		fn to_logical(self, scale_factor: f64) -> ScreenPixelSize {
 			let size = LogicalSize::from_physical(
 				PhysicalSize::new(self.width, self.height),
@@ -325,6 +360,7 @@ pub mod ext {
 	}
 
 	impl ScreenPixelRectExt for ScreenPixelRect {
+		#[inline(always)]
 		fn to_norm(self, size: LogicalSize<u32>) -> ScreenNormRect {
 			ScreenNormRect::new(
 				self.origin.to_norm(size),
@@ -338,6 +374,7 @@ pub mod ext {
 	}
 
 	impl ScreenPhysicalRectExt for ScreenPhysicalRect {
+		#[inline(always)]
 		fn to_logical(self, scale_factor: f64) -> ScreenPixelRect {
 			ScreenPixelRect::new(
 				self.origin.to_logical(scale_factor),
@@ -355,16 +392,19 @@ pub mod ext {
 	}
 
 	impl TexPixelPointExt for TexPixelPoint {
+		#[inline]
 		fn to_norm(self, size: TexPixelSize) -> TexNormPoint {
 			let size: Size2D<f32, TexPixelSpace> = size.cast();
 			let this: Point2D<f32, TexPixelSpace> = self.cast();
 			TexNormPoint::new(this.x / size.width, this.y / size.height)
 		}
 
+		#[inline(always)]
 		fn to_bytes(self) -> TexBytePoint {
 			self.to_bytes_bpp(RGBA8_UNORM_BPP)
 		}
 
+		#[inline(always)]
 		fn to_bytes_bpp(mut self, bpp: u32) -> TexBytePoint {
 			self.x *= bpp;
 			self.cast_unit()
@@ -378,10 +418,12 @@ pub mod ext {
 	}
 
 	impl TexBytePointExt for TexBytePoint {
+		#[inline(always)]
 		fn to_pixels(self) -> TexPixelPoint {
 			self.to_pixels_bpp(RGBA8_UNORM_BPP)
 		}
 
+		#[inline(always)]
 		fn to_pixels_bpp(mut self, bpp: u32) -> TexPixelPoint {
 			self.x /= bpp;
 			self.cast_unit()
@@ -399,6 +441,7 @@ pub mod ext {
 	}
 
 	impl TexPixelSizeExt for TexPixelSize {
+		#[inline]
 		fn to_norm(self, tex_size: TexPixelSize) -> TexNormSize {
 			let tex_size: Size2D<f32, TexPixelSpace> = tex_size.cast();
 			let this: Size2D<f32, TexPixelSpace> = self.cast();
@@ -408,15 +451,18 @@ pub mod ext {
 			)
 		}
 
+		#[inline(always)]
 		fn to_bytes(self) -> TexByteSize {
 			self.to_bytes_bpp(RGBA8_UNORM_BPP)
 		}
 
+		#[inline(always)]
 		fn to_bytes_bpp(mut self, bpp: u32) -> TexByteSize {
 			self.width *= bpp;
 			self.cast_unit()
 		}
 
+		#[inline(always)]
 		fn to_extent(self) -> wgpu::Extent3d {
 			wgpu::Extent3d {
 				width: self.width,
@@ -433,10 +479,12 @@ pub mod ext {
 	}
 
 	impl TexByteSizeExt for TexByteSize {
+		#[inline(always)]
 		fn to_pixels(self) -> TexPixelSize {
 			self.to_pixels_bpp(RGBA8_UNORM_BPP)
 		}
 
+		#[inline(always)]
 		fn to_pixels_bpp(mut self, bpp: u32) -> TexPixelSize {
 			self.width /= bpp;
 			self.cast_unit()
@@ -452,14 +500,17 @@ pub mod ext {
 	}
 
 	impl TexPixelRectExt for TexPixelRect {
+		#[inline(always)]
 		fn to_norm(self, size: TexPixelSize) -> TexNormRect {
 			TexNormRect::new(self.origin.to_norm(size), self.size.to_norm(size))
 		}
 
+		#[inline(always)]
 		fn to_bytes(self) -> TexByteRect {
 			TexByteRect::new(self.origin.to_bytes(), self.size.to_bytes())
 		}
 
+		#[inline(always)]
 		fn to_bytes_bpp(self, bpp: u32) -> TexByteRect {
 			TexByteRect::new(
 				self.origin.to_bytes_bpp(bpp),
@@ -475,10 +526,12 @@ pub mod ext {
 	}
 
 	impl TexByteRectExt for TexByteRect {
+		#[inline(always)]
 		fn to_pixels(self) -> TexPixelRect {
 			TexPixelRect::new(self.origin.to_pixels(), self.size.to_pixels())
 		}
 
+		#[inline(always)]
 		fn to_pixels_bpp(self, bpp: u32) -> TexPixelRect {
 			TexPixelRect::new(
 				self.origin.to_pixels_bpp(bpp),
