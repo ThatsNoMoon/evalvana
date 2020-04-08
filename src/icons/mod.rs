@@ -50,7 +50,6 @@ impl Icons {
 
 		this.create_atlas();
 
-		std::fs::write("texture.dat", this.atlas.as_slice()).unwrap();
 		this
 	}
 
