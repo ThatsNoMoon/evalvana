@@ -1,4 +1,4 @@
-use euclid::{Point2D, Rect, Scale, Size2D};
+use euclid::{Length, Point2D, Rect, Scale, Size2D};
 
 pub enum ScreenPixelSpace {}
 pub enum ScreenNormSpace {}
@@ -7,6 +7,10 @@ pub enum ScreenPhysicalSpace {}
 pub enum TexPixelSpace {}
 pub enum TexNormSpace {}
 pub enum TexByteSpace {}
+
+pub type ScreenPixelLength = Length<u32, ScreenPixelSpace>;
+pub type ScreenNormLength = Length<f32, ScreenNormSpace>;
+pub type ScreenPhysicalLength = Length<u32, ScreenPhysicalSpace>;
 
 pub type ScreenPixelPoint = Point2D<u32, ScreenPixelSpace>;
 pub type ScreenNormPoint = Point2D<f32, ScreenNormSpace>;
@@ -58,7 +62,7 @@ pub mod bounding_box_ext {
 		fn inflate_left(self, t: T) -> Self;
 		fn inflate_right(self, t: T) -> Self;
 
-		fn deflate(self, t: T) -> Self;
+		fn deflate(self, width: T, height: T) -> Self;
 
 		fn deflate_top(self, t: T) -> Self;
 		fn deflate_bottom(self, t: T) -> Self;
@@ -163,13 +167,13 @@ pub mod bounding_box_ext {
 		}
 
 		#[inline]
-		fn deflate(mut self, t: T) -> Self {
-			self.origin.x += t;
-			self.origin.y += t;
-			self.size.width -= t;
-			self.size.width -= t;
-			self.size.height -= t;
-			self.size.height -= t;
+		fn deflate(mut self, width: T, height: T) -> Self {
+			self.origin.x += width;
+			self.origin.y += height;
+			self.size.width -= width;
+			self.size.width -= width;
+			self.size.height -= height;
+			self.size.height -= height;
 
 			self
 		}
@@ -281,7 +285,7 @@ pub mod ext {
 	use crate::icons::RGBA8_UNORM_BPP;
 
 	use winit::{
-		dpi::{LogicalSize, PhysicalSize, Pixel},
+		dpi::{LogicalSize, PhysicalSize},
 		window::Window,
 	};
 

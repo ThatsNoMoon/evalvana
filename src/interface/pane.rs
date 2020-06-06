@@ -1,24 +1,41 @@
-use crate::repl::evaluation::{EditedExpression, Evaluation};
+use super::UpdatingContext;
 
-use crate::input::commands::Command;
+use crate::{
+	events::Event,
+	geometry::ScreenPixelRect,
+	rendering::drawing::DrawingId,
+	repl::evaluation::{EditedExpression, Evaluation},
+};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+use winit::event::{Event as WinitEvent, WindowEvent};
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct Pane {
 	pub name: String,
 	pub evaluations: Vec<Evaluation>,
 	pub current_input: EditedExpression,
+	pub drawing_id: DrawingId,
+	pub drawn_bounds: Option<ScreenPixelRect>,
 }
 
 impl Pane {
-	pub fn new(name: String) -> Pane {
+	pub fn new(ctx: &mut UpdatingContext<'_>, name: String) -> Pane {
 		Pane {
 			name,
 			evaluations: vec![],
 			current_input: EditedExpression::default(),
+			drawing_id: ctx.drawing_manager.next_drawing_id(),
+			drawn_bounds: None,
 		}
 	}
 
-	pub fn handle_input(&mut self, input: Command) {
-		self.current_input.handle_input(input);
+	pub fn update(&mut self, ctx: &mut UpdatingContext<'_>) {
+		match &ctx.event {
+			Event::WinitEvent(WinitEvent::WindowEvent {
+				event: WindowEvent::Resized(_),
+				..
+			}) => self.drawn_bounds = None,
+			_ => (),
+		}
 	}
 }

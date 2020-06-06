@@ -4,29 +4,96 @@ use color::Color;
 mod pipelines;
 use pipelines::Pipelines;
 
-pub mod text;
+mod text;
 use text::TextRenderer;
 
-mod drawable;
-use drawable::{Drawable, DrawingContext};
+pub mod drawing;
+use drawing::{Drawable, DrawingBuffers, DrawingContext, DrawingManager};
 
 use crate::{
 	config::Config,
-	geometry::{ScreenNormPoint, TexNormPoint},
+	geometry::{
+		ScreenNormPoint, ScreenPixelPoint, ScreenPixelRect, ScreenPixelSize,
+		TexNormPoint,
+	},
 	icons::Icons,
 	interface::Interface,
 };
 
-use std::time::Instant;
+use std::{convert::TryInto, time::Instant};
 
 use crossbeam_channel::bounded as bounded_channel;
-use wgpu_glyph::{
-	GlyphBrushBuilder, Scale as FontScale, Section, SectionText, VariedSection,
-};
+
 use winit::{dpi::PhysicalSize, window::Window};
 use zerocopy::{AsBytes, FromBytes};
 
 const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
+
+#[derive(Debug)]
+struct ActiveBuffers<T: BufferElement> {
+	inner: Vec<(Vec<T>, T::Offset)>,
+}
+
+impl<T: BufferElement> ActiveBuffers<T> {
+	fn len(&self) -> usize {
+		self.inner.len()
+	}
+
+	fn total_len(&self) -> usize {
+		self.inner.iter().map(|(buffer, _)| buffer.len()).sum()
+	}
+
+	fn clear(&mut self) {
+		self.inner.clear();
+	}
+
+	fn push(&mut self, v: Vec<T>, offset: T::Offset) {
+		self.inner.push((v, offset));
+	}
+
+	fn iter(&self) -> impl Iterator<Item = &'_ Vec<T>> + '_ {
+		self.inner.iter().map(|(buffer, _)| buffer)
+	}
+
+	fn bounds_iter(
+		&self,
+	) -> impl Iterator<Item = (usize, &'_ Vec<T>, usize, T::Offset)> + '_ {
+		self.inner
+			.iter()
+			.scan((0, 0), |(start, end), (buffer, offset)| {
+				*start = *end;
+				*end += buffer.len();
+				Some((*start, buffer, *end, *offset))
+			})
+	}
+
+	fn drain(&mut self) -> impl Iterator<Item = Vec<T>> + '_ {
+		self.inner.drain(..).map(|(buffer, _)| buffer)
+	}
+
+	fn as_slice(&self) -> &[(Vec<T>, T::Offset)] {
+		self.inner.as_slice()
+	}
+
+	fn is_completely_empty(&self) -> bool {
+		self.total_len() == 0
+	}
+}
+
+impl<T: AsBytes + BufferElement> ActiveBuffers<T> {
+	fn byte_len(&self) -> usize {
+		self.inner
+			.iter()
+			.map(|(buffer, _)| buffer.as_bytes().len())
+			.sum()
+	}
+}
+
+impl<T: BufferElement> Default for ActiveBuffers<T> {
+	fn default() -> ActiveBuffers<T> {
+		ActiveBuffers { inner: vec![] }
+	}
+}
 
 pub struct Renderer {
 	surface: wgpu::Surface,
@@ -39,13 +106,15 @@ pub struct Renderer {
 
 	text_renderer: TextRenderer,
 
-	color_vertices: Option<Vec<ColorVertex>>,
-	color_indices: Option<Vec<VertexIndex>>,
+	pub drawing_manager: DrawingManager,
+
+	color_vertices: Option<ActiveBuffers<ColorVertex>>,
+	color_indices: Option<ActiveBuffers<VertexIndex>>,
 	color_vertex_buffer: wgpu::Buffer,
 	color_index_buffer: wgpu::Buffer,
 
-	texture_vertices: Option<Vec<TextureVertex>>,
-	texture_indices: Option<Vec<VertexIndex>>,
+	texture_vertices: Option<ActiveBuffers<TextureVertex>>,
+	texture_indices: Option<ActiveBuffers<VertexIndex>>,
 	texture_vertex_buffer: wgpu::Buffer,
 	texture_index_buffer: wgpu::Buffer,
 
@@ -55,7 +124,6 @@ pub struct Renderer {
 
 impl Renderer {
 	pub fn new(window: &Window, icons: &Icons) -> Renderer {
-		let size = window.inner_size();
 		let surface = wgpu::Surface::create(window);
 
 		let adapter = wgpu::Adapter::request(&wgpu::RequestAdapterOptions {
@@ -121,6 +189,7 @@ impl Renderer {
 				usage: wgpu::BufferUsage::INDEX | wgpu::BufferUsage::MAP_WRITE,
 			});
 
+		let size = window.inner_size();
 		let sc_desc = wgpu::SwapChainDescriptor {
 			usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
 			format: COLOR_FORMAT,
@@ -135,6 +204,8 @@ impl Renderer {
 
 		let delta_times = [0f32; 20];
 
+		let drawing_manager = DrawingManager::default();
+
 		Renderer {
 			surface,
 			adapter,
@@ -146,13 +217,15 @@ impl Renderer {
 
 			text_renderer,
 
-			color_vertices: Some(vec![]),
-			color_indices: Some(vec![]),
+			drawing_manager,
+
+			color_vertices: Some(ActiveBuffers::default()),
+			color_indices: Some(ActiveBuffers::default()),
 			color_vertex_buffer,
 			color_index_buffer,
 
-			texture_vertices: Some(vec![]),
-			texture_indices: Some(vec![]),
+			texture_vertices: Some(ActiveBuffers::default()),
+			texture_indices: Some(ActiveBuffers::default()),
 			texture_vertex_buffer,
 			texture_index_buffer,
 
@@ -191,89 +264,206 @@ impl Renderer {
 		texture_vertices.clear();
 		texture_indices.clear();
 
-		let ctx = DrawingContext::new(
-			window,
-			config,
-			icons,
-			&mut color_vertices,
-			&mut color_indices,
-			&mut texture_vertices,
-			&mut texture_indices,
-			&mut self.text_renderer,
-		);
-		interface.draw(ctx, ());
+		{
+			let mut ctx = DrawingContext::new(
+				window,
+				config,
+				icons,
+				&mut self.drawing_manager,
+				&self.text_renderer,
+			);
 
-		let n_color_indices = color_indices.len() as u32;
-		let n_texture_indices = texture_indices.len() as u32;
+			let window_size =
+				window.inner_size().to_logical(window.scale_factor());
 
-		enum ListMessage {
-			ColorVertexList(Vec<ColorVertex>),
-			ColorIndexList(Vec<VertexIndex>),
-			TextureVertexList(Vec<TextureVertex>),
-			TextureIndexList(Vec<VertexIndex>),
+			interface.draw(
+				&mut ctx,
+				ScreenPixelRect::new(
+					ScreenPixelPoint::origin(),
+					ScreenPixelSize::new(window_size.width, window_size.height),
+				),
+				(),
+			);
 		}
 
-		let (list_sender, list_receiver) = bounded_channel(4);
+		{
+			let mut color_vertex_offset = 0;
+			let mut texture_vertex_offset = 0;
 
-		let list_sender_clone = list_sender.clone();
-		self.color_vertex_buffer.map_write_async(
-			0,
-			color_vertices.as_bytes().len() as wgpu::BufferAddress,
-			move |vertex_buffer| {
-				vertex_buffer
-					.unwrap()
-					.data
-					.copy_from_slice(color_vertices.as_slice());
-				list_sender_clone
-					.send(ListMessage::ColorVertexList(color_vertices))
-					.expect("Failed to send color vertex list");
-			},
-		);
+			for buffers in self.drawing_manager.take_all_drawing_buffers() {
+				let DrawingBuffers {
+					color_vertex_buffer,
+					color_index_buffer,
+					texture_vertex_buffer,
+					texture_index_buffer,
+				} = buffers;
+				color_indices.push(color_index_buffer, color_vertex_offset);
+				color_vertex_offset += color_vertex_buffer.len() as VertexIndex;
+				color_vertices.push(color_vertex_buffer, ());
+				texture_indices
+					.push(texture_index_buffer, texture_vertex_offset);
+				texture_vertex_offset +=
+					texture_vertex_buffer.len() as VertexIndex;
+				texture_vertices.push(texture_vertex_buffer, ());
+			}
+		}
 
-		let list_sender_clone = list_sender.clone();
-		self.color_index_buffer.map_write_async(
-			0,
-			color_indices.as_bytes().len() as wgpu::BufferAddress,
-			move |color_index_buffer| {
-				color_index_buffer
-					.unwrap()
-					.data
-					.copy_from_slice(color_indices.as_slice());
-				list_sender_clone
-					.send(ListMessage::ColorIndexList(color_indices))
-					.expect("Failed to send color index list");
-			},
-		);
+		let n_color_indices = color_indices.total_len() as u32;
+		let n_texture_indices = texture_indices.total_len() as u32;
 
-		let list_sender_clone = list_sender.clone();
-		self.texture_vertex_buffer.map_write_async(
-			0,
-			texture_vertices.as_bytes().len() as wgpu::BufferAddress,
-			move |vertex_buffer| {
-				vertex_buffer
-					.unwrap()
-					.data
-					.copy_from_slice(texture_vertices.as_slice());
-				list_sender_clone
-					.send(ListMessage::TextureVertexList(texture_vertices))
-					.expect("Failed to send texture vertex list");
-			},
-		);
+		enum ListMessage {
+			ColorVertices(ActiveBuffers<ColorVertex>),
+			ColorIndices(ActiveBuffers<VertexIndex>),
+			TextureVertices(ActiveBuffers<TextureVertex>),
+			TextureIndices(ActiveBuffers<VertexIndex>),
+		}
 
-		let list_sender_clone = list_sender.clone();
-		self.texture_index_buffer.map_write_async(
-			0,
-			texture_indices.as_bytes().len() as wgpu::BufferAddress,
-			move |texture_index_buffer| {
-				texture_index_buffer
-					.unwrap()
-					.data
-					.copy_from_slice(texture_indices.as_slice());
-				list_sender_clone
-					.send(ListMessage::TextureIndexList(texture_indices))
-					.expect("Failed to send texture index list");
-			},
-		);
+		let n_updated_buffers = [
+			color_vertices.total_len(),
+			color_indices.total_len(),
+			texture_vertices.total_len(),
+			texture_indices.total_len(),
+		]
+		.iter()
+		.filter(|&&len| len > 0)
+		.count();
+
+		let (list_sender, list_receiver) = bounded_channel(n_updated_buffers);
+
+		if !color_vertices.is_completely_empty() {
+			let list_sender_clone = list_sender.clone();
+			self.color_vertex_buffer.map_write_async(
+				0,
+				color_vertices.byte_len() as wgpu::BufferAddress,
+				move |color_vertex_buffer| {
+					let dest = &mut color_vertex_buffer.unwrap().data;
+					for (start, src, end, ()) in color_vertices.bounds_iter() {
+						dest[start..end].copy_from_slice(src);
+					}
+					list_sender_clone
+						.send(ListMessage::ColorVertices(color_vertices))
+						.expect("Failed to send color vertex list");
+				},
+			);
+		} else {
+			self.color_vertices = Some(color_vertices);
+		}
+
+		if !color_indices.is_completely_empty() {
+			let list_sender_clone = list_sender.clone();
+			self.color_index_buffer.map_write_async(
+				0,
+				color_indices.byte_len() as wgpu::BufferAddress,
+				move |color_index_buffer| {
+					let dest = &mut color_index_buffer.unwrap().data;
+					for (start, src, end, offset) in color_indices.bounds_iter()
+					{
+						dest[start..end].copy_from_slice(src);
+						for index in dest[start..end].iter_mut() {
+							*index += offset;
+						}
+					}
+					list_sender_clone
+						.send(ListMessage::ColorIndices(color_indices))
+						.expect("Failed to send color index list");
+				},
+			);
+		} else {
+			self.color_indices = Some(color_indices);
+		}
+
+		if !texture_vertices.is_completely_empty() {
+			let list_sender_clone = list_sender.clone();
+			self.texture_vertex_buffer.map_write_async(
+				0,
+				texture_vertices.byte_len() as wgpu::BufferAddress,
+				move |texture_vertex_buffer| {
+					let dest = &mut texture_vertex_buffer.unwrap().data;
+					for (start, src, end, ()) in texture_vertices.bounds_iter()
+					{
+						dest[start..end].copy_from_slice(src);
+					}
+					list_sender_clone
+						.send(ListMessage::TextureVertices(texture_vertices))
+						.expect("Failed to send texture vertex list");
+				},
+			);
+		} else {
+			self.texture_vertices = Some(texture_vertices);
+		}
+
+		if !texture_indices.is_completely_empty() {
+			self.texture_index_buffer.map_write_async(
+				0,
+				texture_indices.byte_len() as wgpu::BufferAddress,
+				move |texture_index_buffer| {
+					let dest = &mut texture_index_buffer.unwrap().data;
+					for (start, src, end, offset) in
+						texture_indices.bounds_iter()
+					{
+						dest[start..end].copy_from_slice(src);
+						for index in dest[start..end].iter_mut() {
+							*index += offset;
+						}
+					}
+					list_sender
+						.send(ListMessage::TextureIndices(texture_indices))
+						.expect("Failed to send texture index list");
+				},
+			);
+		} else {
+			self.texture_indices = Some(texture_indices);
+		}
+
+		self.device.poll(true);
+
+		for _ in 0..n_updated_buffers {
+			match list_receiver
+				.recv()
+				.expect("Failed to receive vertex/index list")
+			{
+				ListMessage::ColorVertices(list) => {
+					self.color_vertices = Some(list)
+				}
+				ListMessage::ColorIndices(list) => {
+					self.color_indices = Some(list)
+				}
+				ListMessage::TextureVertices(list) => {
+					self.texture_vertices = Some(list)
+				}
+				ListMessage::TextureIndices(list) => {
+					self.texture_indices = Some(list)
+				}
+			}
+		}
+
+		let zipped_iter = self
+			.color_vertices
+			.as_mut()
+			.unwrap()
+			.drain()
+			.zip(self.color_indices.as_mut().unwrap().drain())
+			.zip(self.texture_vertices.as_mut().unwrap().drain())
+			.zip(self.texture_indices.as_mut().unwrap().drain())
+			.enumerate()
+			.map(|(i, (((c_v, c_i), t_v), t_i))| (i, c_v, c_i, t_v, t_i));
+
+		for (
+			i,
+			color_vertex_buffer,
+			color_index_buffer,
+			texture_vertex_buffer,
+			texture_index_buffer,
+		) in zipped_iter
+		{
+			let buffers = DrawingBuffers {
+				color_vertex_buffer,
+				color_index_buffer,
+				texture_vertex_buffer,
+				texture_index_buffer,
+			};
+			self.drawing_manager.replace_buffers_at(i as u32, buffers);
+		}
 
 		let frame = self.swap_chain.get_next_texture();
 		let mut encoder = self.device.create_command_encoder(
@@ -328,6 +518,14 @@ impl Renderer {
 		}
 
 		{
+			for section in self
+				.drawing_manager
+				.text_queues()
+				.flat_map(|queue| queue.sections.iter())
+			{
+				self.text_renderer.queue(section);
+			}
+
 			self.text_renderer
 				.draw_queued(
 					&mut self.device,
@@ -337,28 +535,6 @@ impl Renderer {
 					self.swap_chain_descriptor.height,
 				)
 				.expect("Failed to draw glyphs");
-		}
-
-		self.device.poll(true);
-
-		for _ in 0..4 {
-			match list_receiver
-				.recv()
-				.expect("Failed to receive vertex/index list")
-			{
-				ListMessage::ColorVertexList(list) => {
-					self.color_vertices = Some(list)
-				}
-				ListMessage::ColorIndexList(list) => {
-					self.color_indices = Some(list)
-				}
-				ListMessage::TextureVertexList(list) => {
-					self.texture_vertices = Some(list)
-				}
-				ListMessage::TextureIndexList(list) => {
-					self.texture_indices = Some(list)
-				}
-			}
 		}
 
 		self.color_vertex_buffer.unmap();
@@ -383,6 +559,10 @@ impl Renderer {
 			.device
 			.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
 	}
+}
+
+trait BufferElement {
+	type Offset: Copy;
 }
 
 #[repr(C)]
@@ -411,6 +591,10 @@ unsafe impl FromBytes for ColorVertex {
 	}
 }
 
+impl BufferElement for ColorVertex {
+	type Offset = ();
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TextureVertex {
@@ -437,6 +621,10 @@ unsafe impl FromBytes for TextureVertex {
 	}
 }
 
+impl BufferElement for TextureVertex {
+	type Offset = ();
+}
+
 pub type VertexIndex = u16;
 
 trait VertexIndexFormat {
@@ -449,4 +637,8 @@ impl VertexIndexFormat for u16 {
 
 impl VertexIndexFormat for u32 {
 	const WGPU_FORMAT: wgpu::IndexFormat = wgpu::IndexFormat::Uint32;
+}
+
+impl BufferElement for VertexIndex {
+	type Offset = VertexIndex;
 }

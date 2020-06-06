@@ -1,30 +1,34 @@
-use crate::input::commands::Command;
+use crate::{
+	events::{commands::Command, Event},
+	interface::UpdatingContext,
+};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct EditedExpression {
-	input: String,
-	cursor: usize,
+	pub input: String,
+	pub cursor: usize,
 }
 
 impl EditedExpression {
-	pub fn handle_input(&mut self, input: Command) {
-		match input {
-			Command::Insert(inserted) => {
-				self.input.push(inserted);
+	pub fn update(&mut self, ctx: &mut UpdatingContext) {
+		match &ctx.event {
+			Event::Command(Command::Insert(inserted)) => {
+				self.input.push(*inserted);
 				self.cursor += inserted.len_utf8();
 			}
-			Command::Backspace => {
+			Event::Command(Command::Backspace) => {
 				if let Some(removed) = self.input.pop() {
 					self.cursor -= removed.len_utf8();
 				}
 			}
+			_ => (),
 		}
 	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Expression {
-	input: String,
+	pub input: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,23 +36,24 @@ pub enum Result {
 	Empty,
 	Success(PlainResult),
 	Error(PlainResult),
+	Warning(PlainResult),
 	Compound(CompoundResult),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlainResult {
-	text: String,
+	pub text: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompoundResult {
-	success: Option<PlainResult>,
-	warnings: Vec<PlainResult>,
-	errors: Vec<PlainResult>,
+	pub success: Option<PlainResult>,
+	pub warnings: Vec<PlainResult>,
+	pub errors: Vec<PlainResult>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Evaluation {
-	input: Expression,
-	output: Result,
+	pub input: Expression,
+	pub output: Result,
 }

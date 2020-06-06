@@ -1,18 +1,16 @@
-use super::norm_scale_factor;
-
-const LOGO_16: &'static [u8] = include_bytes!(concat!(
+const LOGO_16: &[u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
 	"/assets/icons/logo/logo_16.png"
 ));
-const LOGO_32: &'static [u8] = include_bytes!(concat!(
+const LOGO_32: &[u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
 	"/assets/icons/logo/logo_32.png"
 ));
-const LOGO_64: &'static [u8] = include_bytes!(concat!(
+const LOGO_64: &[u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
 	"/assets/icons/logo/logo_64.png"
 ));
-const LOGO_128: &'static [u8] = include_bytes!(concat!(
+const LOGO_128: &[u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
 	"/assets/icons/logo/logo_128.png"
 ));

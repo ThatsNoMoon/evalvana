@@ -1,17 +1,20 @@
-use crate::config::{Config, EditorColors, UiColors};
-use crate::icons::Icons;
-use crate::interface::Interface;
-use crate::renderer::{color::Color, Renderer};
+use crate::{
+	config::{Config, EditorColors, FontSettings, UiColors},
+	events::Event,
+	icons::Icons,
+	interface::{Interface, UpdatingContext},
+	rendering::{color::Color, Renderer},
+};
 
 use std::time::{Duration, Instant};
 
-use image::{png::PngDecoder, ImageDecoder};
+use wgpu_glyph::Scale as FontScale;
 use winit::{
 	dpi::LogicalSize,
-	event::{Event, WindowEvent},
+	event::{Event as WinitEvent, WindowEvent},
 	event_loop::{ControlFlow, EventLoop},
 	monitor::MonitorHandle,
-	window::{Icon, Window, WindowBuilder},
+	window::{Window, WindowBuilder},
 };
 
 pub struct App {
@@ -23,8 +26,8 @@ pub struct App {
 	icons: Icons,
 }
 
-impl App {
-	pub fn new() -> App {
+impl Default for App {
+	fn default() -> App {
 		let config = Config {
 			ui_colors: UiColors {
 				bg: Color::from_rgb_u32(0x282C34),
@@ -39,6 +42,7 @@ impl App {
 			editor_colors: EditorColors {
 				bg: Color::from_rgb_u32(0x282C34),
 				main: Color::from_rgb_u32(0xABB2BF),
+				gutter: Color::from_rgb_u32(0x838891),
 				strings: Color::from_rgb_u32(0x98C379),
 				numbers: Color::from_rgb_u32(0xD19A66),
 				operators: Color::from_rgb_u32(0xC678DD),
@@ -48,6 +52,13 @@ impl App {
 				constants: Color::from_rgb_u32(0x56B6C2),
 				types: Color::from_rgb_u32(0x61AFEF),
 				functions: Color::from_rgb_u32(0xABB2BF),
+				success: Color::from_rgb_u32(0x5DD47F),
+				warnings: Color::from_rgb_u32(0xEBCD2E),
+				errors: Color::from_rgb_u32(0xFF4545),
+			},
+			font_settings: FontSettings {
+				ui_font_scale: FontScale::uniform(16.0),
+				editor_font_scale: FontScale::uniform(16.0),
 			},
 		};
 
@@ -64,19 +75,34 @@ impl App {
 
 		App::set_scaled_icon(&window, &icons);
 
-		let renderer = Renderer::new(&window, &icons);
+		let mut renderer = Renderer::new(&window, &icons);
 
-		let mut interface = Interface::default();
+		let mut updating_ctx =
+			UpdatingContext::new(&mut renderer.drawing_manager, Event::Startup);
+
+		let mut interface = Interface::new(&mut updating_ctx);
 
 		{
 			use crate::interface::*;
+			use crate::repl::evaluation::*;
 
-			let pane1 = Pane::new("Some REPL".to_string());
-			let pane2 = Pane::new("Another REPL".to_string());
-			let pane3 = Pane::new("Third REPL".to_string());
-			let pane4 = Pane::new("Fourth REPL".to_string());
-			let pane5 = Pane::new("Fifth REPL".to_string());
-			let pane6 = Pane::new("Sixth REPL".to_string());
+			let ctx = &mut updating_ctx;
+
+			let pane1 = Pane::new(ctx, "Some REPL".to_string());
+			let mut pane2 = Pane::new(ctx, "Another REPL".to_string());
+			let pane3 = Pane::new(ctx, "Third REPL".to_string());
+			let pane4 = Pane::new(ctx, "Fourth REPL".to_string());
+			let pane5 = Pane::new(ctx, "Fifth REPL".to_string());
+			let pane6 = Pane::new(ctx, "Sixth REPL".to_string());
+
+			pane2.evaluations = vec![Evaluation {
+				input: Expression {
+					input: "2 * 2".to_string(),
+				},
+				output: Result::Success(PlainResult {
+					text: "4".to_string(),
+				}),
+			}];
 
 			interface.tree_pane.pane_statuses = PaneStatuses {
 				focused: 1,
@@ -143,7 +169,9 @@ impl App {
 			icons,
 		}
 	}
+}
 
+impl App {
 	pub fn run(self) {
 		let App {
 			window,
@@ -162,16 +190,16 @@ impl App {
 				Instant::now() + Duration::from_millis(delta as u64),
 			);
 
-			match event {
-				Event::MainEventsCleared => window.request_redraw(),
+			match &event {
+				WinitEvent::MainEventsCleared => window.request_redraw(),
 
-				Event::WindowEvent {
+				WinitEvent::WindowEvent {
 					event: WindowEvent::Resized(size),
 					..
 				} => {
-					renderer.resize(size);
+					renderer.resize(*size);
 				}
-				Event::WindowEvent {
+				WinitEvent::WindowEvent {
 					event: WindowEvent::Moved(_),
 					..
 				} => {
@@ -180,24 +208,30 @@ impl App {
 						delta = App::target_delta(&monitor);
 					}
 				}
-				Event::WindowEvent {
+				WinitEvent::WindowEvent {
 					event: WindowEvent::ScaleFactorChanged { scale_factor, .. },
 					..
 				} => {
-					icons.set_scale_factor(scale_factor);
+					icons.set_scale_factor(*scale_factor);
 					App::set_scaled_icon(&window, &icons);
 				}
 
-				Event::RedrawRequested(_) => {
+				WinitEvent::RedrawRequested(_) => {
 					renderer.redraw(&window, &config, &icons, &mut interface);
 				}
 
-				Event::WindowEvent {
+				WinitEvent::WindowEvent {
 					event: WindowEvent::CloseRequested,
 					window_id,
-				} if window_id == window.id() => *control_flow = ControlFlow::Exit,
+				} if window_id == &window.id() => *control_flow = ControlFlow::Exit,
 				_ => (),
 			}
+
+			let mut updating_ctx = UpdatingContext::new(
+				&mut renderer.drawing_manager,
+				Event::WinitEvent(event),
+			);
+			interface.update(&mut updating_ctx);
 		});
 	}
 

@@ -1,8 +1,6 @@
 mod logo;
 mod ui;
 
-use crate::interface::Theme;
-
 use crate::geometry::{
 	ext::*, TexBytePoint, TexByteSize, TexPixelPoint, TexPixelRect,
 	TexPixelSize,
@@ -10,8 +8,8 @@ use crate::geometry::{
 
 use std::convert::TryInto;
 
-use image::{error::ImageResult, png::PngDecoder, ImageDecoder};
-use winit::window::Icon as WindowIcon;
+use image::{png::PngDecoder, ImageDecoder};
+use winit::window::{Icon as WindowIcon, Theme};
 
 pub const RGBA8_UNORM_BPP: u32 = 4;
 
@@ -31,7 +29,7 @@ pub struct Icons {
 
 impl Default for Icons {
 	fn default() -> Icons {
-		Icons::new(1.0, Theme::default())
+		Icons::new(1.0, Theme::Dark)
 	}
 }
 
@@ -58,7 +56,7 @@ impl Icons {
 
 	fn create_atlas(&mut self) {
 		let mut icon_data =
-			[ui::close::bytes_for(self.scale_factor, self.theme)];
+			[ui::close::bytes_for(self.scale_factor, &self.theme)];
 
 		icon_data.sort_unstable_by_key(|(_, size)| size.width);
 		icon_data.sort_by_key(|(_, size)| size.height);

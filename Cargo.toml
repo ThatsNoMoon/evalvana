@@ -17,6 +17,8 @@ image = "0.23"
 euclid = "0.20"
 num-traits = "0.2"
 static_assertions = "1.1"
+lyon_tessellation = "0.15"
+cfg-if = "0.1"
 
 [build-dependencies]
 shaderc = "0.6"

@@ -1,31 +1,30 @@
 use std::borrow::Cow;
 
 use wgpu_glyph::{
-	FontId, GlyphBrush, GlyphBrushBuilder, Scale as FontScale, Section,
-	SectionText, VariedSection,
+	rusttype::Font, FontId, GlyphBrush, GlyphBrushBuilder, VariedSection,
 };
 
-const EDITOR_FONT: &'static [u8] = include_bytes!(concat!(
+const EDITOR_FONT: &[u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
 	"/assets/fonts/JetBrainsMono/JetBrainsMono-Regular.ttf"
 ));
 
-const UI_FONT: &'static [u8] = include_bytes!(concat!(
+const UI_FONT: &[u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
 	"/assets/fonts/Roboto/Roboto-Regular.ttf"
 ));
 
-const UI_FONT_MEDIUM: &'static [u8] = include_bytes!(concat!(
+const UI_FONT_MEDIUM: &[u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
 	"/assets/fonts/Roboto/Roboto-Medium.ttf"
 ));
 
-const UI_FONT_BOLD: &'static [u8] = include_bytes!(concat!(
+const UI_FONT_BOLD: &[u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
 	"/assets/fonts/Roboto/Roboto-Bold.ttf"
 ));
 
-const UI_FONT_ITALIC: &'static [u8] = include_bytes!(concat!(
+const UI_FONT_ITALIC: &[u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
 	"/assets/fonts/Roboto/Roboto-Italic.ttf"
 ));
@@ -104,5 +103,9 @@ impl TextRenderer {
 
 	pub fn ui_font_italic(&self) -> FontId {
 		self.ui_font_italic
+	}
+
+	pub fn font_data(&self, id: FontId) -> &Font {
+		&self.glyph_brush.fonts()[id.0]
 	}
 }
