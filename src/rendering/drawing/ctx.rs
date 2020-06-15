@@ -262,7 +262,6 @@ impl<'a> DrawingContext<'a> {
 		bounding_box: ScreenPixelRect,
 		color: Color,
 	) {
-		log::debug!("Drawing rect {:?}", bounding_box);
 		let buffers = match self.manager.get_buffers_for(id) {
 			Some(buffers) => buffers,
 			None => {

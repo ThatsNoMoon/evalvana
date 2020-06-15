@@ -339,7 +339,6 @@ impl DrawableChild for Panes {
 	) -> ScreenPixelRect {
 		match self {
 			Panes::VerticalSplit(PaneList { panes, focused }) => {
-				log::debug!("Drawing V-split");
 				if panes.is_empty() {
 					ctx.draw_solid_rect(id, bounds, ctx.config.ui_colors.bg);
 					return bounds;
@@ -372,7 +371,6 @@ impl DrawableChild for Panes {
 				}
 			}
 			Panes::HorizontalSplit(PaneList { panes, focused }) => {
-				log::debug!("Drawing H-split");
 				if panes.is_empty() {
 					ctx.draw_solid_rect(id, bounds, ctx.config.ui_colors.bg);
 					return bounds;
@@ -393,7 +391,6 @@ impl DrawableChild for Panes {
 				}
 			}
 			Panes::Tabbed(PaneList { panes, focused }) => {
-				log::debug!("Drawing tabbed");
 				if panes.is_empty() {
 					ctx.draw_solid_rect(
 						id,
@@ -419,7 +416,6 @@ impl DrawableChild for Panes {
 					tab_focused: bool,
 					parent_focused: bool,
 				) -> ScreenPixelRect {
-					log::debug!("Drawing tab");
 					let bg_color = if tab_focused {
 						ctx.config.editor_colors.bg
 					} else {
