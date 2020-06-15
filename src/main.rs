@@ -8,6 +8,7 @@ pub mod icons;
 pub mod interface;
 pub mod rendering;
 pub mod repl;
+pub mod util;
 
 fn main() {
 	env_logger::init();

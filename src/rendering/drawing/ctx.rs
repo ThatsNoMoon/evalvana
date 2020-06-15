@@ -12,6 +12,7 @@ use crate::{
 		color::Color, text::TextRenderer, ColorVertex, TextureVertex,
 		VertexIndex,
 	},
+	util::{Id, IdManager},
 };
 
 use cfg_if::cfg_if;
@@ -121,65 +122,23 @@ impl BuffersEntry {
 	}
 }
 
-#[derive(Debug)]
-pub struct DrawingId {
-	inner: u32,
-	id_relinquisher: Sender<u32>,
-}
+#[derive(Debug, PartialEq, Eq)]
+pub struct DrawingId(Id<u32>);
 
-impl PartialEq for DrawingId {
-	fn eq(&self, other: &DrawingId) -> bool {
-		self.inner == other.inner
-			&& self.id_relinquisher.same_channel(&other.id_relinquisher)
-	}
-}
-
-impl Eq for DrawingId {}
-
-impl Drop for DrawingId {
-	fn drop(&mut self) {
-		self.id_relinquisher
-			.try_send(self.inner)
-			.unwrap_or_else(|err| {
-				log::debug!(
-					"Failed to relinquish DrawingId {}: {}",
-					err.into_inner(),
-					err,
-				)
-			});
-	}
-}
-
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct DrawingManager {
 	buffers: Vec<BuffersEntry>,
-	id_reclaimer: Receiver<u32>,
-	id_relinquisher: Sender<u32>,
-}
-
-impl Default for DrawingManager {
-	fn default() -> DrawingManager {
-		let (id_relinquisher, id_reclaimer) = unbounded_channel();
-		DrawingManager {
-			buffers: vec![],
-			id_relinquisher,
-			id_reclaimer,
-		}
-	}
+	id_manager: IdManager<u32>,
 }
 
 impl DrawingManager {
 	pub fn next_drawing_id(&mut self) -> DrawingId {
-		let id_relinquisher = self.id_relinquisher.clone();
 		for (i, entry) in self.buffers.iter_mut().enumerate() {
 			let entry = &mut entry.drawing_buffers;
 			if let Some(buffers) = entry.take_unoccupied() {
 				*entry = DrawingBuffersEntry::Occupied(buffers);
 
-				return DrawingId {
-					inner: i as u32,
-					id_relinquisher,
-				};
+				return DrawingId(self.id_manager.create_id(i as u32));
 			}
 		}
 
@@ -190,14 +149,11 @@ impl DrawingManager {
 			),
 		});
 
-		DrawingId {
-			inner: self.buffers.len() as u32 - 1,
-			id_relinquisher,
-		}
+		DrawingId(self.id_manager.create_id(self.buffers.len() as u32 - 1))
 	}
 
 	pub fn update(&mut self) {
-		while let Ok(relinquished_id) = self.id_reclaimer.try_recv() {
+		for relinquished_id in self.id_manager.reclaimed_ids() {
 			let relinquished_id = relinquished_id as usize;
 			match self.buffers.get_mut(relinquished_id).and_then(
 				|buffer_entry| buffer_entry.drawing_buffers.take_occupied(),
@@ -218,7 +174,7 @@ impl DrawingManager {
 		&mut self,
 		id: &DrawingId,
 	) -> Option<&mut DrawingBuffers> {
-		let idx = id.inner as usize;
+		let idx = id.0.inner as usize;
 		self.buffers.get_mut(idx).and_then(|buffer_entry| {
 			buffer_entry.drawing_buffers.get_occupied_mut()
 		})
@@ -228,7 +184,7 @@ impl DrawingManager {
 		&mut self,
 		id: &DrawingId,
 	) -> Option<&mut TextQueue> {
-		let idx = id.inner as usize;
+		let idx = id.0.inner as usize;
 		self.buffers
 			.get_mut(idx)
 			.map(|buffer_entry| &mut buffer_entry.text_queue)
@@ -269,7 +225,7 @@ impl DrawingManager {
 
 	pub fn clear(&mut self, id: &DrawingId) {
 		self.buffers
-			.get_mut(id.inner as usize)
+			.get_mut(id.0.inner as usize)
 			.expect("Attempted to clear nonexistent buffers")
 			.clear();
 	}
