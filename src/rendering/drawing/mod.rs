@@ -429,7 +429,7 @@ impl DrawableChild for Panes {
 					};
 
 					let bounding_box =
-						bounds.deflate_top(5).deflate_left(5).deflate_right(5);
+						bounds.deflate_top(8).deflate_left(4).deflate_right(4);
 
 					ctx.draw_solid_rect(id, bounding_box, bg_color);
 
@@ -471,7 +471,7 @@ impl DrawableChild for Panes {
 					bounds
 				}
 
-				let tabs_bounds = tabs_bg_bounds.deflate_left(10);
+				let tabs_bounds = tabs_bg_bounds.deflate_left(4);
 
 				let n: u32 = panes.len().try_into().unwrap();
 
