@@ -1,5 +1,9 @@
 use crate::{
-	events::{commands::Command, Event},
+	events::{
+		actions::{Action, ActionData},
+		commands::Command,
+		Event,
+	},
 	interface::UpdatingContext,
 };
 
@@ -10,18 +14,21 @@ pub struct EditedExpression {
 }
 
 impl EditedExpression {
-	pub fn update(&mut self, ctx: &mut UpdatingContext) {
+	pub fn update(&mut self, ctx: &mut UpdatingContext) -> Action {
 		match &ctx.event {
 			Event::Command(Command::Insert(inserted)) => {
 				self.input.push(*inserted);
 				self.cursor += inserted.len_utf8();
+				Action::Single(ActionData::RequestRedraw)
 			}
-			Event::Command(Command::Backspace) => {
-				if let Some(removed) = self.input.pop() {
+			Event::Command(Command::Backspace) => match self.input.pop() {
+				Some(removed) => {
 					self.cursor -= removed.len_utf8();
+					Action::Single(ActionData::RequestRedraw)
 				}
-			}
-			_ => (),
+				_ => Action::None,
+			},
+			_ => Action::None,
 		}
 	}
 }

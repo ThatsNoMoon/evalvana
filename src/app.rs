@@ -32,6 +32,7 @@ impl Default for App {
 			ui_colors: UiColors {
 				bg: Color::from_rgb_u32(0x282C34),
 				secondary_bg: Color::from_rgb_u32(0x1D2026),
+				hovered_bg: Color::from_rgb_u32(0x2F343D),
 				focused_bg: Color::from_rgb_u32(0x333842),
 				unfocused_bg: Color::from_rgb_u32(0x1D2026),
 				text: Color::from_rgb_u32(0xC1C8D6),
@@ -77,8 +78,11 @@ impl Default for App {
 
 		let mut renderer = Renderer::new(&window, &icons);
 
-		let mut updating_ctx =
-			UpdatingContext::new(&mut renderer.drawing_manager, Event::Startup);
+		let mut updating_ctx = UpdatingContext::new(
+			&mut renderer.drawing_manager,
+			&window,
+			Event::Startup,
+		);
 
 		let mut interface = Interface::new(&mut updating_ctx);
 
@@ -97,7 +101,7 @@ impl Default for App {
 
 			pane2.evaluations = vec![Evaluation {
 				input: Expression {
-					input: "2 * 2".to_string(),
+					input: "let x = 2;\nlet y = 2;\nx * y".to_string(),
 				},
 				output: Result::Success(PlainResult {
 					text: "4".to_string(),
@@ -105,6 +109,7 @@ impl Default for App {
 			}];
 
 			interface.tree_pane.pane_statuses = PaneStatuses {
+				drawn_bounds: None,
 				focused: 1,
 				pane_statuses: vec![
 					PaneStatus::of_pane(&pane1),
@@ -117,15 +122,22 @@ impl Default for App {
 			};
 
 			interface.tree_pane.evaluators = Evaluators {
+				drawn_bounds: None,
 				evaluators: vec![
 					Evaluator {
+						drawn_bounds: None,
 						name: "Rust".to_string(),
+						hovered: false,
 					},
 					Evaluator {
+						drawn_bounds: None,
 						name: "Lua".to_string(),
+						hovered: false,
 					},
 					Evaluator {
+						drawn_bounds: None,
 						name: "TypeScript".to_string(),
+						hovered: false,
 					},
 				],
 			};
@@ -229,6 +241,7 @@ impl App {
 
 			let mut updating_ctx = UpdatingContext::new(
 				&mut renderer.drawing_manager,
+				&window,
 				Event::WinitEvent(event),
 			);
 			interface.update(&mut updating_ctx);

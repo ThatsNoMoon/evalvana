@@ -163,7 +163,7 @@ impl DrawableChild for PaneStatuses {
 		&mut self,
 		id: &DrawingId,
 		ctx: &mut DrawingContext<'_>,
-		bounds: ScreenPixelRect,
+		mut bounds: ScreenPixelRect,
 		_: (),
 	) -> ScreenPixelRect {
 		let mut current_bounds = bounds;
@@ -187,7 +187,11 @@ impl DrawableChild for PaneStatuses {
 			drawn_bounds = drawn_bounds.with_bottom(inner_bounds.bottom());
 		}
 
-		bounds.with_h(drawn_bounds.size.height)
+		bounds.size.height = drawn_bounds.size.height;
+
+		self.drawn_bounds = Some(bounds);
+
+		bounds
 	}
 }
 
@@ -203,6 +207,8 @@ impl DrawableChild for PaneStatus {
 	) -> ScreenPixelRect {
 		if is_focused {
 			ctx.draw_solid_rect(id, bounds, ctx.config.ui_colors.focused_bg);
+		} else if self.hovered {
+			ctx.draw_solid_rect(id, bounds, ctx.config.ui_colors.hovered_bg);
 		}
 		let text_bounds = bounds
 			.deflate_left(20)
@@ -229,6 +235,8 @@ impl DrawableChild for PaneStatus {
 
 		ctx.draw_icon_rect(id, icon_bounds, IconType::Close);
 
+		self.drawn_bounds = Some(bounds);
+
 		bounds
 	}
 }
@@ -240,7 +248,7 @@ impl DrawableChild for Evaluators {
 		&mut self,
 		id: &DrawingId,
 		ctx: &mut DrawingContext<'_>,
-		bounds: ScreenPixelRect,
+		mut bounds: ScreenPixelRect,
 		_: (),
 	) -> ScreenPixelRect {
 		let mut current_bounds = bounds;
@@ -261,7 +269,12 @@ impl DrawableChild for Evaluators {
 				current_bounds.deflate_top(inner_bounds.size.height);
 			drawn_bounds = drawn_bounds.with_bottom(inner_bounds.bottom());
 		}
-		bounds.with_h(drawn_bounds.size.height)
+
+		bounds.size.height = drawn_bounds.size.height;
+
+		self.drawn_bounds = Some(bounds);
+
+		bounds
 	}
 }
 
@@ -275,15 +288,23 @@ impl DrawableChild for Evaluator {
 		bounds: ScreenPixelRect,
 		_: (),
 	) -> ScreenPixelRect {
-		ctx.draw_solid_rect(
-			id,
-			bounds
-				.deflate_left(13)
-				.deflate_right(13)
-				.deflate_top(7)
-				.deflate_bottom(7),
-			ctx.config.ui_colors.bg,
-		);
+		{
+			let bg = if self.hovered {
+				ctx.config.ui_colors.hovered_bg
+			} else {
+				ctx.config.ui_colors.bg
+			};
+
+			ctx.draw_solid_rect(
+				id,
+				bounds
+					.deflate_left(13)
+					.deflate_right(13)
+					.deflate_top(7)
+					.deflate_bottom(7),
+				bg,
+			);
+		}
 
 		ctx.draw_text(
 			id,
@@ -299,6 +320,9 @@ impl DrawableChild for Evaluator {
 					.to_section_bounds()
 			},
 		);
+
+		self.drawn_bounds = Some(bounds);
+
 		bounds
 	}
 }

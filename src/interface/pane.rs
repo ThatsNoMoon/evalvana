@@ -1,7 +1,7 @@
 use super::UpdatingContext;
 
 use crate::{
-	events::Event,
+	events::{actions::Action, Event},
 	geometry::ScreenPixelRect,
 	rendering::drawing::DrawingId,
 	repl::evaluation::{EditedExpression, Evaluation},
@@ -29,13 +29,17 @@ impl Pane {
 		}
 	}
 
-	pub fn update(&mut self, ctx: &mut UpdatingContext<'_>) {
+	pub fn update(&mut self, ctx: &mut UpdatingContext<'_>) -> Action {
 		match &ctx.event {
 			Event::WinitEvent(WinitEvent::WindowEvent {
 				event: WindowEvent::Resized(_),
 				..
-			}) => self.drawn_bounds = None,
-			_ => (),
+			}) => {
+				self.drawn_bounds = None;
+				Action::None
+			}
+
+			_ => Action::None,
 		}
 	}
 }

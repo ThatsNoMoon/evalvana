@@ -285,12 +285,15 @@ pub mod ext {
 	use crate::icons::RGBA8_UNORM_BPP;
 
 	use winit::{
-		dpi::{LogicalSize, PhysicalSize},
+		dpi::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize},
 		window::Window,
 	};
 
 	pub trait ScreenPixelPointExt: Sized {
 		fn to_norm(self, size: LogicalSize<u32>) -> ScreenNormPoint;
+		fn from_physical(pos: PhysicalPosition<f64>, scale_factor: f64)
+			-> Self;
+		fn from_logical(pos: LogicalPosition<f64>) -> Self;
 	}
 
 	impl ScreenPixelPointExt for ScreenPixelPoint {
@@ -304,10 +307,27 @@ pub mod ext {
 				(this.y / window_size.height - 0.5) * 2.0,
 			)
 		}
+
+		#[inline]
+		fn from_physical(
+			pos: PhysicalPosition<f64>,
+			scale_factor: f64,
+		) -> Self {
+			let LogicalPosition { x, y } = pos.to_logical(scale_factor);
+			ScreenPixelPoint::new(x, y)
+		}
+
+		#[inline]
+		fn from_logical(pos: LogicalPosition<f64>) -> Self {
+			let LogicalPosition { x, y } = pos.cast();
+			ScreenPixelPoint::new(x, y)
+		}
 	}
 
 	pub trait ScreenPhysicalPointExt: Sized {
 		fn to_logical(self, scale_factor: f64) -> ScreenPixelPoint;
+		fn from_physical(pos: PhysicalPosition<f64>) -> Self;
+		fn from_logical(pos: LogicalPosition<f64>, scale_factor: f64) -> Self;
 	}
 
 	impl ScreenPhysicalPointExt for ScreenPhysicalPoint {
@@ -318,6 +338,18 @@ pub mod ext {
 				scale_factor,
 			);
 			ScreenPixelPoint::new(size.width, size.height)
+		}
+
+		#[inline]
+		fn from_physical(pos: PhysicalPosition<f64>) -> Self {
+			let PhysicalPosition { x, y } = pos.cast();
+			ScreenPhysicalPoint::new(x, y)
+		}
+
+		#[inline]
+		fn from_logical(pos: LogicalPosition<f64>, scale_factor: f64) -> Self {
+			let PhysicalPosition { x, y } = pos.to_physical(scale_factor);
+			ScreenPhysicalPoint::new(x, y)
 		}
 	}
 

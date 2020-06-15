@@ -19,6 +19,9 @@ num-traits = "0.2"
 static_assertions = "1.1"
 lyon_tessellation = "0.15"
 cfg-if = "0.1"
+#tinyvec = { version = "0.3", features = ["alloc"] }
+# using my fork until PR #74 is merged, fixing tiny_vec! for non-Copy types
+tinyvec = { git = "https://github.com/ThatsNoMoon/tinyvec", features = ["alloc"] }
 
 [build-dependencies]
 shaderc = "0.6"

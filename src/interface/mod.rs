@@ -6,7 +6,7 @@ pub use tree_pane::{
 };
 
 use crate::{
-	events::Event,
+	events::{actions::Action, Event},
 	geometry::{ScreenPixelRect, ScreenPixelSpace},
 	rendering::drawing::{DrawingId, DrawingManager},
 };
@@ -14,25 +14,34 @@ use crate::{
 use euclid::Length;
 use winit::{
 	event::{Event as WinitEvent, WindowEvent},
-	window::Theme,
+	window::{Theme, Window},
 };
 
 #[derive(Debug)]
 pub struct UpdatingContext<'a> {
 	drawing_manager: &'a mut DrawingManager,
+	pub window: &'a Window,
 	pub event: Event<'a>,
 }
 
 impl<'a> UpdatingContext<'a> {
 	pub fn new(
 		drawing_manager: &'a mut DrawingManager,
+		window: &'a Window,
 		event: Event<'a>,
 	) -> UpdatingContext<'a> {
 		UpdatingContext {
 			drawing_manager,
+			window,
 			event,
 		}
 	}
+}
+
+#[derive(Debug, PartialEq)]
+pub enum InterfaceFocus {
+	TreePane,
+	Panes,
 }
 
 #[derive(Debug, PartialEq)]
@@ -43,6 +52,7 @@ pub struct Interface {
 	pub theme: Theme,
 	pub drawing_id: DrawingId,
 	pub drawn_bounds: Option<ScreenPixelRect>,
+	focus: InterfaceFocus,
 }
 
 impl Interface {
@@ -54,6 +64,7 @@ impl Interface {
 			theme: Theme::Dark,
 			drawing_id: ctx.drawing_manager.next_drawing_id(),
 			drawn_bounds: None,
+			focus: InterfaceFocus::Panes,
 		}
 	}
 
@@ -66,8 +77,16 @@ impl Interface {
 			_ => (),
 		}
 
-		self.tree_pane.update(ctx);
-		self.panes.update(ctx);
+		let action = match &ctx.event {
+			Event::Command(_) => match self.focus {
+				InterfaceFocus::TreePane => self.tree_pane.update(ctx),
+				InterfaceFocus::Panes => self.panes.update(ctx),
+			},
+			_ => self.tree_pane.update(ctx) + self.panes.update(ctx),
+		};
+		if action.requests_redraw() {
+			self.drawn_bounds = None;
+		}
 	}
 }
 
@@ -89,7 +108,7 @@ impl Panes {
 		}
 	}
 
-	fn update(&mut self, ctx: &mut UpdatingContext<'_>) {
+	fn update(&mut self, ctx: &mut UpdatingContext<'_>) -> Action {
 		use Panes::*;
 
 		match self {
@@ -114,9 +133,7 @@ pub struct PaneList {
 }
 
 impl PaneList {
-	fn update(&mut self, ctx: &mut UpdatingContext<'_>) {
-		for pane in self.panes.iter_mut() {
-			pane.update(ctx);
-		}
+	fn update(&mut self, ctx: &mut UpdatingContext<'_>) -> Action {
+		self.panes.iter_mut().map(|pane| pane.update(ctx)).sum()
 	}
 }

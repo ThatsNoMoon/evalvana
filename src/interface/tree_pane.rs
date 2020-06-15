@@ -1,7 +1,12 @@
 use super::{Pane, UpdatingContext};
 
 use crate::{
-	events::Event, geometry::ScreenPixelRect, rendering::drawing::DrawingId,
+	events::{
+		actions::{Action, ActionData},
+		Event,
+	},
+	geometry::{ext::ScreenPixelPointExt, ScreenPixelPoint, ScreenPixelRect},
+	rendering::drawing::DrawingId,
 };
 
 use winit::event::{Event as WinitEvent, WindowEvent};
@@ -24,7 +29,7 @@ impl TreePane {
 		}
 	}
 
-	pub fn update(&mut self, ctx: &mut UpdatingContext<'_>) {
+	pub fn update(&mut self, ctx: &mut UpdatingContext<'_>) -> Action {
 		match &ctx.event {
 			Event::WinitEvent(WinitEvent::WindowEvent {
 				event: WindowEvent::Resized(_),
@@ -32,6 +37,12 @@ impl TreePane {
 			}) => self.drawn_bounds = None,
 			_ => (),
 		}
+		let action =
+			self.pane_statuses.update(ctx) + self.evaluators.update(ctx);
+		if action.requests_redraw() {
+			self.drawn_bounds = None;
+		}
+		action
 	}
 }
 
@@ -39,17 +50,60 @@ impl TreePane {
 pub struct PaneStatuses {
 	pub pane_statuses: Vec<PaneStatus>,
 	pub focused: u32,
+	pub drawn_bounds: Option<ScreenPixelRect>,
+}
+
+impl PaneStatuses {
+	fn update(&mut self, ctx: &mut UpdatingContext<'_>) -> Action {
+		self.pane_statuses
+			.iter_mut()
+			.map(|status| status.update(ctx))
+			.sum()
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PaneStatus {
 	pub name: String,
+	pub drawn_bounds: Option<ScreenPixelRect>,
+	pub hovered: bool,
 }
 
 impl PaneStatus {
 	pub fn of_pane(pane: &Pane) -> PaneStatus {
 		PaneStatus {
 			name: pane.name.clone(),
+			drawn_bounds: None,
+			hovered: false,
+		}
+	}
+
+	fn update(&mut self, ctx: &mut UpdatingContext<'_>) -> Action {
+		match &ctx.event {
+			Event::WinitEvent(WinitEvent::WindowEvent {
+				event: WindowEvent::CursorMoved { position, .. },
+				..
+			}) => match &self.drawn_bounds {
+				Some(bounds) => {
+					let position = ScreenPixelPoint::from_physical(
+						*position,
+						ctx.window.scale_factor(),
+					);
+					if !self.hovered && bounds.contains(position) {
+						self.hovered = true;
+						self.drawn_bounds = None;
+						ActionData::RequestRedraw.into()
+					} else if self.hovered && !bounds.contains(position) {
+						self.hovered = false;
+						self.drawn_bounds = None;
+						ActionData::RequestRedraw.into()
+					} else {
+						Action::None
+					}
+				}
+				None => Action::None,
+			},
+			_ => Action::None,
 		}
 	}
 }
@@ -57,9 +111,52 @@ impl PaneStatus {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Evaluators {
 	pub evaluators: Vec<Evaluator>,
+	pub drawn_bounds: Option<ScreenPixelRect>,
+}
+
+impl Evaluators {
+	fn update(&mut self, ctx: &mut UpdatingContext<'_>) -> Action {
+		self.evaluators
+			.iter_mut()
+			.map(|evaluator| evaluator.update(ctx))
+			.sum()
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Evaluator {
 	pub name: String,
+	pub drawn_bounds: Option<ScreenPixelRect>,
+	pub hovered: bool,
+}
+
+impl Evaluator {
+	fn update(&mut self, ctx: &mut UpdatingContext<'_>) -> Action {
+		match &ctx.event {
+			Event::WinitEvent(WinitEvent::WindowEvent {
+				event: WindowEvent::CursorMoved { position, .. },
+				..
+			}) => match &self.drawn_bounds {
+				Some(bounds) => {
+					let position = ScreenPixelPoint::from_physical(
+						*position,
+						ctx.window.scale_factor(),
+					);
+					if !self.hovered && bounds.contains(position) {
+						self.hovered = true;
+						self.drawn_bounds = None;
+						Action::from(ActionData::RequestRedraw)
+					} else if self.hovered && !bounds.contains(position) {
+						self.hovered = false;
+						self.drawn_bounds = None;
+						Action::from(ActionData::RequestRedraw)
+					} else {
+						Action::None
+					}
+				}
+				None => Action::None,
+			},
+			_ => Action::None,
+		}
+	}
 }
