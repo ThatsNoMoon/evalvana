@@ -9,7 +9,8 @@ use super::color::Color;
 use crate::{
 	config::EditorColors,
 	geometry::{
-		bounding_box_ext::BoundingBoxExt, ScreenPixelLength, ScreenPixelRect,
+		bounding_box_ext::{BoundingBoxExt, MutBoundingBoxExt},
+		ScreenPixelLength, ScreenPixelRect,
 	},
 	icons::IconType,
 	interface::{
@@ -346,7 +347,10 @@ impl DrawableChild for Panes {
 
 				let n: u32 = panes.len().try_into().unwrap();
 				let inner_bounds = {
-					let total_width = bounds.size.width - 2 * (n - 1);
+					let total_width = bounds
+						.size
+						.width
+						.saturating_sub(2 * (n.saturating_sub(1)));
 					let total_width = total_width as f64;
 					let inner_pane_width = total_width / (n as f64);
 					let inner_pane_width = inner_pane_width.ceil() as u32;
@@ -462,7 +466,10 @@ impl DrawableChild for Panes {
 
 					let icon_bounds = bounding_box
 						.deflate_left(
-							bounding_box.size.width - bounding_box.size.height,
+							bounding_box
+								.size
+								.width
+								.saturating_sub(bounding_box.size.height),
 						)
 						.deflate(icon_margin, icon_margin);
 

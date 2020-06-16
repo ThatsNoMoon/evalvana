@@ -40,7 +40,7 @@ pub mod bounding_box_ext {
 	use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 	use euclid::{Point2D, Rect, Size2D};
-	use num_traits::cast::NumCast;
+	use num_traits::{cast::NumCast, ops::saturating::SaturatingSub};
 	use wgpu_glyph::Section;
 
 	pub trait BoundingBoxExt<T, S>: Sized {
@@ -54,6 +54,10 @@ pub mod bounding_box_ext {
 		fn top_right(&self) -> Point2D<T, S>;
 		fn bottom_right(&self) -> Point2D<T, S>;
 
+		fn to_section_bounds(self) -> Section<'static>;
+	}
+
+	pub trait MutBoundingBoxExt<T, S>: Sized {
 		fn with_size(self, size: Size2D<T, S>) -> Self;
 		fn with_origin(self, origin: Point2D<T, S>) -> Self;
 
@@ -81,19 +85,11 @@ pub mod bounding_box_ext {
 		fn with_top(self, y: T) -> Self;
 		fn with_left(self, x: T) -> Self;
 		fn with_right(self, x: T) -> Self;
-
-		fn to_section_bounds(self) -> Section<'static>;
 	}
 
 	impl<T, S> BoundingBoxExt<T, S> for Rect<T, S>
 	where
-		T: Add<Output = T>
-			+ AddAssign
-			+ Sub<Output = T>
-			+ SubAssign
-			+ PartialOrd
-			+ NumCast
-			+ Copy,
+		T: Add<Output = T> + PartialOrd + NumCast + Copy,
 	{
 		#[inline(always)]
 		fn top(&self) -> T {
@@ -132,6 +128,26 @@ pub mod bounding_box_ext {
 			)
 		}
 
+		#[inline]
+		fn to_section_bounds(self) -> Section<'static> {
+			let this = self.to_f32();
+			Section {
+				screen_position: this.origin.to_tuple(),
+				bounds: this.size.to_tuple(),
+				..Section::default()
+			}
+		}
+	}
+
+	impl<T, S> MutBoundingBoxExt<T, S> for Rect<T, S>
+	where
+		T: Add<Output = T>
+			+ AddAssign
+			+ SaturatingSub
+			+ PartialOrd
+			+ NumCast
+			+ Copy,
+	{
 		#[inline(always)]
 		fn with_size(mut self, size: Size2D<T, S>) -> Self {
 			self.size = size;
@@ -145,7 +161,7 @@ pub mod bounding_box_ext {
 
 		#[inline(always)]
 		fn inflate_top(mut self, t: T) -> Self {
-			self.origin.y -= t;
+			self.origin.y = self.origin.y.saturating_sub(&t);
 			self.size.height += t;
 			self
 		}
@@ -156,7 +172,7 @@ pub mod bounding_box_ext {
 		}
 		#[inline(always)]
 		fn inflate_left(mut self, t: T) -> Self {
-			self.origin.x -= t;
+			self.origin.x = self.origin.x.saturating_sub(&t);
 			self.size.width += t;
 			self
 		}
@@ -170,10 +186,10 @@ pub mod bounding_box_ext {
 		fn deflate(mut self, width: T, height: T) -> Self {
 			self.origin.x += width;
 			self.origin.y += height;
-			self.size.width -= width;
-			self.size.width -= width;
-			self.size.height -= height;
-			self.size.height -= height;
+			self.size.width = self.size.width.saturating_sub(&width);
+			self.size.width = self.size.width.saturating_sub(&width);
+			self.size.height = self.size.height.saturating_sub(&height);
+			self.size.height = self.size.height.saturating_sub(&height);
 
 			self
 		}
@@ -181,23 +197,23 @@ pub mod bounding_box_ext {
 		#[inline(always)]
 		fn deflate_top(mut self, t: T) -> Self {
 			self.origin.y += t;
-			self.size.height -= t;
+			self.size.height = self.size.height.saturating_sub(&t);
 			self
 		}
 		#[inline(always)]
 		fn deflate_bottom(mut self, t: T) -> Self {
-			self.size.height -= t;
+			self.size.height = self.size.height.saturating_sub(&t);
 			self
 		}
 		#[inline(always)]
 		fn deflate_left(mut self, t: T) -> Self {
 			self.origin.x += t;
-			self.size.width -= t;
+			self.size.width = self.size.width.saturating_sub(&t);
 			self
 		}
 		#[inline(always)]
 		fn deflate_right(mut self, t: T) -> Self {
-			self.size.width -= t;
+			self.size.width = self.size.width.saturating_sub(&t);
 			self
 		}
 
@@ -235,13 +251,16 @@ pub mod bounding_box_ext {
 
 		#[inline(always)]
 		fn with_bottom(mut self, bottom: T) -> Self {
-			self.size.height = bottom - self.origin.y;
+			self.size.height = bottom.saturating_sub(&self.origin.y);
 			self
 		}
 		#[inline]
 		fn with_top(mut self, top: T) -> Self {
 			if top > self.origin.y {
-				self.size.height -= top - self.origin.y;
+				self.size.height = self
+					.size
+					.height
+					.saturating_sub(&top.saturating_sub(&self.origin.y));
 			} else {
 				self.size.height += self.origin.y - top;
 			}
@@ -252,7 +271,10 @@ pub mod bounding_box_ext {
 		#[inline]
 		fn with_left(mut self, left: T) -> Self {
 			if left > self.origin.x {
-				self.size.width -= left - self.origin.x;
+				self.size.width = self
+					.size
+					.width
+					.saturating_sub(&left.saturating_sub(&self.origin.x));
 			} else {
 				self.size.width += self.origin.x - left;
 			}
@@ -264,16 +286,6 @@ pub mod bounding_box_ext {
 		fn with_right(mut self, right: T) -> Self {
 			self.size.width = right - self.origin.x;
 			self
-		}
-
-		#[inline]
-		fn to_section_bounds(self) -> Section<'static> {
-			let this = self.to_f32();
-			Section {
-				screen_position: this.origin.to_tuple(),
-				bounds: this.size.to_tuple(),
-				..Section::default()
-			}
 		}
 	}
 }
