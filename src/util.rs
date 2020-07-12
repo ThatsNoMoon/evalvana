@@ -1,7 +1,6 @@
 use crossbeam_channel::{unbounded as unbounded_channel, Receiver, Sender};
-use tinyvec::TinyVec;
 
-use std::{fmt::Display, mem::ManuallyDrop};
+use std::fmt::Display;
 
 #[derive(Debug)]
 pub struct Id<T: Display + Copy> {
@@ -16,7 +15,7 @@ impl<T: PartialEq + Display + Copy> PartialEq for Id<T> {
 	}
 }
 
-impl<T: PartialEq + Display + Copy> Eq for Id<T> {}
+impl<T: Eq + Display + Copy> Eq for Id<T> {}
 
 impl<T: Display + Copy> Drop for Id<T> {
 	fn drop(&mut self) {
@@ -38,7 +37,7 @@ pub struct IdManager<T> {
 	id_relinquisher: Sender<T>,
 }
 
-impl<T: Display + Copy> Default for IdManager<T> {
+impl<T> Default for IdManager<T> {
 	fn default() -> Self {
 		let (id_relinquisher, id_reclaimer) = unbounded_channel();
 		IdManager {

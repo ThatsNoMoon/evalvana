@@ -37,7 +37,7 @@ pub type TexNormRect = Rect<f32, TexNormSpace>;
 pub type TexByteRect = Rect<u32, TexByteSpace>;
 
 pub mod bounding_box_ext {
-	use std::ops::{Add, AddAssign, Sub, SubAssign};
+	use std::ops::{Add, AddAssign};
 
 	use euclid::{Point2D, Rect, Size2D};
 	use num_traits::{cast::NumCast, ops::saturating::SaturatingSub};
@@ -316,7 +316,7 @@ pub mod ext {
 
 			ScreenNormPoint::new(
 				(this.x / window_size.width - 0.5) * 2.0,
-				(this.y / window_size.height - 0.5) * 2.0,
+				(this.y / window_size.height - 0.5) * -2.0,
 			)
 		}
 
@@ -409,11 +409,11 @@ pub mod ext {
 
 	impl ScreenPixelRectExt for ScreenPixelRect {
 		#[inline(always)]
-		fn to_norm(self, size: LogicalSize<u32>) -> ScreenNormRect {
-			ScreenNormRect::new(
-				self.origin.to_norm(size),
-				self.size.to_norm(size),
-			)
+		fn to_norm(self, window_size: LogicalSize<u32>) -> ScreenNormRect {
+			let origin = self.origin.to_norm(window_size);
+			let mut size = self.size.to_norm(window_size);
+			size.height *= -1.0;
+			ScreenNormRect::new(origin, size)
 		}
 	}
 

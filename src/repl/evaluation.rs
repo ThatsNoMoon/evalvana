@@ -26,9 +26,9 @@ impl EditedExpression {
 					self.cursor -= removed.len_utf8();
 					Action::Single(ActionData::RequestRedraw)
 				}
-				_ => Action::None,
+				_ => Action::none(),
 			},
-			_ => Action::None,
+			_ => Action::none(),
 		}
 	}
 }

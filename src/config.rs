@@ -1,6 +1,6 @@
 use crate::rendering::color::Color;
 
-use wgpu_glyph::Scale as FontScale;
+use wgpu_glyph::ab_glyph::PxScale as FontScale;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Config {

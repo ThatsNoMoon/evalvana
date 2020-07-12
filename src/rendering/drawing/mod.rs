@@ -1,6 +1,9 @@
 mod ctx;
 
-pub use ctx::{DrawingBuffers, DrawingContext, DrawingId, DrawingManager};
+pub use ctx::{
+	BufferElementIter, DrawingBuffers, DrawingContext, DrawingId,
+	DrawingManager,
+};
 
 mod tessellation;
 
@@ -25,7 +28,10 @@ use crate::{
 
 use std::convert::TryInto;
 
-use wgpu_glyph::{Layout, Section, VerticalAlign};
+use wgpu_glyph::{
+	ab_glyph::{Font, ScaleFont},
+	Layout, Section, Text, VerticalAlign,
+};
 
 pub trait Drawable {
 	type UserData;
@@ -109,14 +115,16 @@ impl Drawable for TreePane {
 			scale
 		};
 
-		let statuses_title = Section {
-			text: "Open REPLs",
-			color: ctx.config.ui_colors.accent.to_rgba(),
-			font_id: ctx.text_renderer.ui_font_medium(),
-			scale: title_scale,
-			layout: Layout::default_single_line(),
-			..statuses_title_bounds.to_section_bounds()
-		};
+		let statuses_title = Section::default()
+			.add_text(
+				Text::new("Open REPLs")
+					.with_color(ctx.config.ui_colors.accent.to_rgba())
+					.with_font_id(ctx.text_renderer.ui_font_medium())
+					.with_scale(title_scale),
+			)
+			.with_layout(Layout::default_single_line())
+			.with_screen_position(statuses_title_bounds.origin.to_f32())
+			.with_bounds(statuses_title_bounds.size.to_f32());
 		ctx.draw_text(&self.drawing_id, statuses_title);
 
 		current_bounds = current_bounds
@@ -134,14 +142,16 @@ impl Drawable for TreePane {
 		let evaluators_title_bounds =
 			current_bounds.with_h(20).deflate_left(10);
 
-		let evaluators_title = Section {
-			text: "Available REPLs",
-			color: ctx.config.ui_colors.accent.to_rgba(),
-			font_id: ctx.text_renderer.ui_font_medium(),
-			scale: title_scale,
-			layout: Layout::default_single_line(),
-			..evaluators_title_bounds.to_section_bounds()
-		};
+		let evaluators_title = Section::default()
+			.add_text(
+				Text::new("Available REPLs")
+					.with_color(ctx.config.ui_colors.accent.to_rgba())
+					.with_font_id(ctx.text_renderer.ui_font_medium())
+					.with_scale(title_scale),
+			)
+			.with_layout(Layout::default_single_line())
+			.with_screen_position(evaluators_title_bounds.origin.to_f32())
+			.with_bounds(evaluators_title_bounds.size.to_f32());
 		ctx.draw_text(&self.drawing_id, evaluators_title);
 
 		current_bounds = current_bounds
@@ -217,15 +227,19 @@ impl DrawableChild for PaneStatus {
 			.deflate_right(bounds.size.height);
 		ctx.draw_text(
 			id,
-			Section {
-				text: self.name.as_str(),
-				color: ctx.config.ui_colors.text.to_rgba(),
-				font_id: ctx.text_renderer.ui_font(),
-				scale: ctx.config.font_settings.ui_font_scale,
-				layout: Layout::default_single_line()
-					.v_align(VerticalAlign::Center),
-				..text_bounds.to_section_bounds()
-			},
+			Section::default()
+				.add_text(
+					Text::new(self.name.as_str())
+						.with_color(ctx.config.ui_colors.text.to_rgba())
+						.with_font_id(ctx.text_renderer.ui_font())
+						.with_scale(ctx.config.font_settings.ui_font_scale),
+				)
+				.with_layout(
+					Layout::default_single_line()
+						.v_align(VerticalAlign::Center),
+				)
+				.with_screen_position(text_bounds.origin.to_f32())
+				.with_bounds(text_bounds.size.to_f32()),
 		);
 
 		let icon_margin = u32::max(2, bounds.size.height / 5);
@@ -307,19 +321,24 @@ impl DrawableChild for Evaluator {
 			);
 		}
 
+		let text_bounds = bounds
+			.deflate_left(22)
+			.added_y(bounds.size.height / 2)
+			.with_h(bounds.size.height / 3);
+
 		ctx.draw_text(
 			id,
-			Section {
-				text: self.name.as_str(),
-				color: ctx.config.ui_colors.text.to_rgba(),
-				font_id: ctx.text_renderer.ui_font_medium(),
-				layout: Layout::default_wrap().v_align(VerticalAlign::Center),
-				..bounds
-					.deflate_left(22)
-					.added_y(bounds.size.height / 2)
-					.with_h(bounds.size.height / 3)
-					.to_section_bounds()
-			},
+			Section::default()
+				.add_text(
+					Text::new(self.name.as_str())
+						.with_color(ctx.config.ui_colors.text.to_rgba())
+						.with_font_id(ctx.text_renderer.ui_font_medium()),
+				)
+				.with_layout(
+					Layout::default_wrap().v_align(VerticalAlign::Center),
+				)
+				.with_screen_position(text_bounds.origin.to_f32())
+				.with_bounds(text_bounds.size.to_f32()),
 		);
 
 		self.drawn_bounds = Some(bounds);
@@ -453,15 +472,19 @@ impl DrawableChild for Panes {
 
 					ctx.draw_text(
 						id,
-						Section {
-							text: title,
-							color: text_color.to_rgba(),
-							font_id: ctx.text_renderer.ui_font(),
-							scale: title_scale,
-							layout: Layout::default_single_line()
-								.v_align(VerticalAlign::Center),
-							..text_bounds.to_section_bounds()
-						},
+						Section::default()
+							.add_text(
+								Text::new(title)
+									.with_color(text_color.to_rgba())
+									.with_font_id(ctx.text_renderer.ui_font())
+									.with_scale(title_scale),
+							)
+							.with_layout(
+								Layout::default_single_line()
+									.v_align(VerticalAlign::Center),
+							)
+							.with_screen_position(text_bounds.origin.to_f32())
+							.with_bounds(text_bounds.size.to_f32()),
 					);
 
 					let icon_bounds = bounding_box
@@ -624,18 +647,16 @@ impl DrawableChild for Expression {
 			let line_digits =
 				(self.input.lines().count() as f32).log10().ceil();
 
-			let font =
-				ctx.text_renderer.font_data(ctx.text_renderer.editor_font());
-			let v_metrics = font.v_metrics(font_scale);
-			let h_metrics = font
-				.glyph('0')
-				.scaled(ctx.config.font_settings.editor_font_scale)
-				.h_metrics();
+			let font = ctx
+				.text_renderer
+				.font_data(ctx.text_renderer.editor_font())
+				.as_scaled(font_scale);
+			let glyph = font.glyph_id('0');
 
 			(
-				v_metrics.ascent + v_metrics.descent.abs() + v_metrics.line_gap,
-				h_metrics.advance_width,
-				h_metrics.advance_width * line_digits,
+				font.ascent() + font.descent().abs() + font.line_gap(),
+				font.h_advance(glyph),
+				font.h_advance(glyph) * line_digits,
 			)
 		};
 
@@ -650,26 +671,36 @@ impl DrawableChild for Expression {
 			let gutter_bounds = inner_bounds.with_w(gutter_width);
 			ctx.draw_text(
 				id,
-				Section {
-					text: i.to_string().as_str(),
-					scale: ctx.config.font_settings.editor_font_scale,
-					color: ctx.config.editor_colors.gutter.to_rgba(),
-					layout: Layout::default_single_line(),
-					..gutter_bounds.to_section_bounds()
-				},
+				Section::default()
+					.add_text(
+						Text::new(i.to_string().as_str())
+							.with_color(
+								ctx.config.editor_colors.gutter.to_rgba(),
+							)
+							.with_scale(
+								ctx.config.font_settings.editor_font_scale,
+							),
+					)
+					.with_layout(Layout::default_single_line())
+					.with_screen_position(gutter_bounds.origin.to_f32())
+					.with_bounds(gutter_bounds.size.to_f32()),
 			);
 
 			let line_bounds = current_bounds.deflate_left(gutter_width);
 
 			ctx.draw_text(
 				id,
-				Section {
-					text: line,
-					scale: ctx.config.font_settings.editor_font_scale,
-					color: ctx.config.editor_colors.main.to_rgba(),
-					layout: Layout::default_single_line(),
-					..line_bounds.to_section_bounds()
-				},
+				Section::default()
+					.add_text(
+						Text::new(line)
+							.with_color(ctx.config.editor_colors.main.to_rgba())
+							.with_scale(
+								ctx.config.font_settings.editor_font_scale,
+							),
+					)
+					.with_layout(Layout::default_single_line())
+					.with_screen_position(line_bounds.origin.to_f32())
+					.with_bounds(line_bounds.size.to_f32()),
 			);
 
 			current_bounds =
@@ -737,12 +768,12 @@ impl DrawableChild for PlainResult {
 		color: Color,
 	) -> ScreenPixelRect {
 		let line_height = {
-			let font =
-				ctx.text_renderer.font_data(ctx.text_renderer.editor_font());
-			let v_metrics =
-				font.v_metrics(ctx.config.font_settings.editor_font_scale);
+			let font = ctx
+				.text_renderer
+				.font_data(ctx.text_renderer.editor_font())
+				.as_scaled(ctx.config.font_settings.editor_font_scale);
 
-			v_metrics.ascent + v_metrics.descent.abs() + v_metrics.line_gap
+			font.ascent() + font.descent().abs() + font.line_gap()
 		};
 
 		let n_lines = self.text.lines().count();
@@ -754,12 +785,13 @@ impl DrawableChild for PlainResult {
 
 		ctx.draw_text(
 			id,
-			Section {
-				text: self.text.as_str(),
-				color: color.to_rgba(),
-				layout: Layout::default_wrap(),
-				..inner_bounds.to_section_bounds()
-			},
+			Section::default()
+				.add_text(
+					Text::new(self.text.as_str()).with_color(color.to_rgba()),
+				)
+				.with_layout(Layout::default_wrap())
+				.with_screen_position(inner_bounds.origin.to_f32())
+				.with_bounds(inner_bounds.size.to_f32()),
 		);
 
 		bounds.with_bottom(inner_bounds.bottom())

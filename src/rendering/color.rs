@@ -1,12 +1,14 @@
-use zerocopy::{AsBytes, FromBytes};
+use bytemuck::{Pod, Zeroable};
 
 #[repr(transparent)]
-#[derive(
-	Debug, Clone, Copy, PartialEq, PartialOrd, Default, AsBytes, FromBytes,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 pub struct Color {
 	rgb: [f32; 3],
 }
+
+static_assertions::assert_eq_size!(Color, [f32; 3]);
+unsafe impl Zeroable for Color {}
+unsafe impl Pod for Color {}
 
 use std::fmt;
 

@@ -10,18 +10,19 @@ use crate::{
 	icons::{IconType, Icons},
 	rendering::{
 		color::Color, text::TextRenderer, ColorVertex, TextureVertex,
-		VertexIndex,
+		VertexIndex, VertexIndexInner,
 	},
 	util::{Id, IdManager},
 };
 
+use bytemuck::{cast_slice, Pod};
 use cfg_if::cfg_if;
-use crossbeam_channel::{unbounded as unbounded_channel, Receiver, Sender};
+
+use glyph_brush::{OwnedSection, Section};
 use lyon_tessellation::{
 	basic_shapes::{fill_rectangle, stroke_rectangle},
 	FillOptions, StrokeOptions,
 };
-use wgpu_glyph::{OwnedVariedSection, VariedSection};
 use winit::window::Window;
 
 use std::{
@@ -33,9 +34,9 @@ use std::{
 #[derive(Debug, Default)]
 pub struct DrawingBuffers {
 	pub color_vertex_buffer: Vec<ColorVertex>,
-	pub color_index_buffer: Vec<VertexIndex>,
+	pub color_index_buffer: Vec<VertexIndex<ColorVertex>>,
 	pub texture_vertex_buffer: Vec<TextureVertex>,
-	pub texture_index_buffer: Vec<VertexIndex>,
+	pub texture_index_buffer: Vec<VertexIndex<TextureVertex>>,
 }
 
 impl DrawingBuffers {
@@ -86,6 +87,13 @@ impl DrawingBuffersEntry {
 		}
 	}
 
+	fn get_occupied(&self) -> Option<&DrawingBuffers> {
+		match self {
+			DrawingBuffersEntry::Occupied(buffers) => Some(buffers),
+			_ => None,
+		}
+	}
+
 	fn clear(&mut self) {
 		match self {
 			DrawingBuffersEntry::Occupied(buffers) => buffers.clear(),
@@ -96,11 +104,11 @@ impl DrawingBuffersEntry {
 
 #[derive(Debug, Default)]
 pub struct TextQueue {
-	pub sections: Vec<OwnedVariedSection>,
+	pub sections: Vec<OwnedSection>,
 }
 
 impl TextQueue {
-	fn queue<'a>(&mut self, section: impl Into<Cow<'a, VariedSection<'a>>>) {
+	fn queue<'a>(&mut self, section: impl Into<Cow<'a, Section<'a>>>) {
 		self.sections.push(section.into().into_owned().to_owned());
 	}
 
@@ -110,7 +118,7 @@ impl TextQueue {
 }
 
 #[derive(Debug)]
-struct BuffersEntry {
+pub struct BuffersEntry {
 	text_queue: TextQueue,
 	drawing_buffers: DrawingBuffersEntry,
 }
@@ -198,6 +206,20 @@ impl DrawingManager {
 		})
 	}
 
+	pub fn drawing_buffers(
+		&self,
+	) -> impl Iterator<Item = &'_ DrawingBuffers> + '_ {
+		self.buffers.iter().filter_map(|buffer_entry| {
+			buffer_entry.drawing_buffers.get_occupied()
+		})
+	}
+
+	pub fn element_iter<'buf, T: BufferElement<'buf> + Pod>(
+		&'buf self,
+	) -> T::Iter {
+		T::Iter::new(self.buffers.as_slice())
+	}
+
 	pub fn text_queues(&self) -> impl Iterator<Item = &'_ TextQueue> + '_ {
 		self.buffers
 			.iter()
@@ -228,6 +250,254 @@ impl DrawingManager {
 			.get_mut(id.0.inner as usize)
 			.expect("Attempted to clear nonexistent buffers")
 			.clear();
+	}
+}
+
+pub trait BufferElement<'buf>: Sized {
+	type Iter: BufferElementIter<'buf, Self>;
+}
+
+impl<'buf> BufferElement<'buf> for ColorVertex {
+	type Iter = BufferVertexElementIter<'buf, Self>;
+}
+
+impl<'buf> BufferElement<'buf> for TextureVertex {
+	type Iter = BufferVertexElementIter<'buf, Self>;
+}
+
+pub trait BufferVertexElement: Sized {
+	fn filter(buffers_entry: &BuffersEntry) -> Option<&[Self]>;
+}
+
+impl BufferVertexElement for ColorVertex {
+	fn filter(buffers_entry: &BuffersEntry) -> Option<&[ColorVertex]> {
+		buffers_entry
+			.drawing_buffers
+			.get_occupied()
+			.map(|drawing_buffers| {
+				drawing_buffers.color_vertex_buffer.as_slice()
+			})
+	}
+}
+
+impl BufferVertexElement for TextureVertex {
+	fn filter(buffers_entry: &BuffersEntry) -> Option<&[TextureVertex]> {
+		buffers_entry
+			.drawing_buffers
+			.get_occupied()
+			.map(|drawing_buffers| {
+				drawing_buffers.texture_vertex_buffer.as_slice()
+			})
+	}
+}
+
+pub trait BufferIndexElement<T: BufferVertexElement>: Sized {
+	fn filter(buffers_entry: &BuffersEntry) -> Option<&[Self]>;
+}
+
+impl<'buf> BufferElement<'buf> for VertexIndex<ColorVertex> {
+	type Iter =
+		BufferIndexElementIter<'buf, ColorVertex, VertexIndex<ColorVertex>>;
+}
+
+impl<'buf> BufferElement<'buf> for VertexIndex<TextureVertex> {
+	type Iter =
+		BufferIndexElementIter<'buf, TextureVertex, VertexIndex<TextureVertex>>;
+}
+
+impl BufferIndexElement<ColorVertex> for VertexIndex<ColorVertex> {
+	fn filter(
+		buffers_entry: &BuffersEntry,
+	) -> Option<&[VertexIndex<ColorVertex>]> {
+		buffers_entry
+			.drawing_buffers
+			.get_occupied()
+			.map(|drawing_buffers| {
+				drawing_buffers.color_index_buffer.as_slice()
+			})
+	}
+}
+
+impl BufferIndexElement<TextureVertex> for VertexIndex<TextureVertex> {
+	fn filter(
+		buffers_entry: &BuffersEntry,
+	) -> Option<&[VertexIndex<TextureVertex>]> {
+		buffers_entry
+			.drawing_buffers
+			.get_occupied()
+			.map(|drawing_buffers| {
+				drawing_buffers.texture_index_buffer.as_slice()
+			})
+	}
+}
+
+pub trait BufferElementIter<'buf, T>: Iterator {
+	fn new(buffers: &'buf [BuffersEntry]) -> Self;
+	fn byte_len(&self) -> usize;
+	fn total_len(&self) -> usize;
+	fn is_empty(&self) -> bool;
+}
+
+type BufferVertexElementInnerIter<'buf, T> = std::iter::Scan<
+	std::iter::FilterMap<
+		std::slice::Iter<'buf, BuffersEntry>,
+		fn(&'buf BuffersEntry) -> Option<&'buf [T]>,
+	>,
+	(usize, usize),
+	for<'st> fn(
+		&'st mut (usize, usize),
+		&'buf [T],
+	) -> Option<(usize, &'buf [T], usize)>,
+>;
+
+pub struct BufferVertexElementIter<'buf, T: BufferVertexElement> {
+	buffers: &'buf [BuffersEntry],
+	inner: BufferVertexElementInnerIter<'buf, T>,
+}
+
+impl<'buf, T: BufferVertexElement> Iterator
+	for BufferVertexElementIter<'buf, T>
+{
+	type Item = (usize, &'buf [T], usize);
+
+	fn next(&mut self) -> Option<Self::Item> {
+		self.inner.next()
+	}
+}
+
+impl<'buf, T: BufferVertexElement + Pod> BufferVertexElementIter<'buf, T> {
+	fn scanner(
+		(start, end): &mut (usize, usize),
+		buffer: &'buf [T],
+	) -> Option<(usize, &'buf [T], usize)> {
+		*start = *end;
+		*end += buffer.len();
+		Some((*start, buffer, *end))
+	}
+
+	fn iter(
+		buffers: &'buf [BuffersEntry],
+	) -> BufferVertexElementInnerIter<'buf, T> {
+		buffers
+			.iter()
+			.filter_map(T::filter as fn(_) -> _)
+			.scan((0, 0), Self::scanner as for<'st> fn(&'st mut _, _) -> _)
+	}
+}
+
+impl<'buf, T: BufferVertexElement + Pod> BufferElementIter<'buf, T>
+	for BufferVertexElementIter<'buf, T>
+{
+	fn new(buffers: &'buf [BuffersEntry]) -> Self {
+		Self {
+			buffers,
+			inner: Self::iter(buffers),
+		}
+	}
+
+	fn byte_len(&self) -> usize {
+		Self::iter(self.buffers)
+			.map(|(_, slice, _)| cast_slice::<_, u8>(slice).len())
+			.sum()
+	}
+
+	fn total_len(&self) -> usize {
+		Self::iter(self.buffers)
+			.map(|(_, slice, _)| slice.len())
+			.sum()
+	}
+
+	fn is_empty(&self) -> bool {
+		Self::iter(self.buffers).next().is_none()
+	}
+}
+
+type BufferIndexElementInnerIter<'buf, V, I> = std::iter::Scan<
+	std::iter::FilterMap<
+		std::slice::Iter<'buf, BuffersEntry>,
+		fn(&'buf BuffersEntry) -> Option<(&'buf [V], &'buf [I])>,
+	>,
+	(usize, usize, VertexIndexInner),
+	for<'st> fn(
+		&'st mut (usize, usize, VertexIndexInner),
+		(&'buf [V], &'buf [I]),
+	) -> Option<(usize, &'buf [I], usize, VertexIndexInner)>,
+>;
+
+pub struct BufferIndexElementIter<
+	'buf,
+	V: BufferVertexElement,
+	I: BufferIndexElement<V>,
+> {
+	buffers: &'buf [BuffersEntry],
+	inner: BufferIndexElementInnerIter<'buf, V, I>,
+}
+
+impl<'buf, V: BufferVertexElement, I: BufferIndexElement<V>> Iterator
+	for BufferIndexElementIter<'buf, V, I>
+{
+	type Item = (usize, &'buf [I], usize, VertexIndexInner);
+
+	fn next(&mut self) -> Option<Self::Item> {
+		self.inner.next()
+	}
+}
+
+impl<'buf, V: BufferVertexElement, I: BufferIndexElement<V> + Pod>
+	BufferIndexElementIter<'buf, V, I>
+{
+	fn filter(buffer: &'buf BuffersEntry) -> Option<(&'buf [V], &'buf [I])> {
+		V::filter(buffer).and_then(|v| I::filter(buffer).map(|i| (v, i)))
+	}
+
+	fn scanner(
+		(start, end, offset): &mut (usize, usize, VertexIndexInner),
+		(vertices, indices): (&'buf [V], &'buf [I]),
+	) -> Option<(usize, &'buf [I], usize, VertexIndexInner)> {
+		*start = *end;
+		*end += indices.len();
+		let res = Some((*start, indices, *end, *offset));
+		*offset += {
+			let len: VertexIndexInner = vertices.len().try_into().unwrap();
+			len
+		};
+		res
+	}
+
+	fn iter(
+		buffers: &'buf [BuffersEntry],
+	) -> BufferIndexElementInnerIter<'buf, V, I> {
+		buffers
+			.iter()
+			.filter_map(Self::filter as fn(_) -> _)
+			.scan((0, 0, 0), Self::scanner as for<'st> fn(&'st mut _, _) -> _)
+	}
+}
+
+impl<'buf, V: BufferVertexElement, I: BufferIndexElement<V> + Pod>
+	BufferElementIter<'buf, I> for BufferIndexElementIter<'buf, V, I>
+{
+	fn new(buffers: &'buf [BuffersEntry]) -> Self {
+		Self {
+			buffers,
+			inner: Self::iter(buffers),
+		}
+	}
+
+	fn byte_len(&self) -> usize {
+		Self::iter(self.buffers)
+			.map(|(_, slice, _, _)| cast_slice::<_, u8>(slice).len())
+			.sum()
+	}
+
+	fn total_len(&self) -> usize {
+		Self::iter(self.buffers)
+			.map(|(_, slice, _, _)| slice.len())
+			.sum()
+	}
+
+	fn is_empty(&self) -> bool {
+		Self::iter(self.buffers).next().is_none()
 	}
 }
 
@@ -389,19 +659,19 @@ impl<'a> DrawingContext<'a> {
 		]);
 
 		buffers.texture_index_buffer.extend_from_slice(&[
-			0 + start_idx,
-			1 + start_idx,
-			2 + start_idx,
-			0 + start_idx,
-			3 + start_idx,
-			2 + start_idx,
+			VertexIndex::from(0 + start_idx),
+			VertexIndex::from(1 + start_idx),
+			VertexIndex::from(2 + start_idx),
+			VertexIndex::from(0 + start_idx),
+			VertexIndex::from(3 + start_idx),
+			VertexIndex::from(2 + start_idx),
 		]);
 	}
 
 	pub(super) fn draw_text<'b>(
 		&mut self,
 		id: &DrawingId,
-		section: impl Into<Cow<'b, VariedSection<'b>>>,
+		section: impl Into<Cow<'b, Section<'b>>>,
 	) {
 		let text_queue = match self.manager.get_text_queue_for(id) {
 			Some(queue) => queue,

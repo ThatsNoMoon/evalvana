@@ -36,10 +36,10 @@ impl Pane {
 				..
 			}) => {
 				self.drawn_bounds = None;
-				Action::None
+				Action::none()
 			}
 
-			_ => Action::None,
+			_ => Action::none(),
 		}
 	}
 }

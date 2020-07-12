@@ -72,9 +72,11 @@ fn create_color_pipeline(
 
 	let bind_group_layout =
 		device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+			label: None,
 			bindings: &[],
 		});
 	let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+		label: Some("evalvana_color_pipeline_bind_group"),
 		layout: &bind_group_layout,
 		bindings: &[],
 	});
@@ -117,26 +119,28 @@ fn create_color_pipeline(
 				write_mask: wgpu::ColorWrite::ALL,
 			}],
 			depth_stencil_state: None,
-			index_format: VertexIndex::WGPU_FORMAT,
-			vertex_buffers: &[wgpu::VertexBufferDescriptor {
-				stride: std::mem::size_of::<ColorVertex>()
-					as wgpu::BufferAddress,
-				step_mode: wgpu::InputStepMode::Vertex,
-				attributes: &[
-					wgpu::VertexAttributeDescriptor {
-						offset: memoffset::offset_of!(ColorVertex, pos)
-							as wgpu::BufferAddress,
-						format: wgpu::VertexFormat::Float2,
-						shader_location: 0,
-					},
-					wgpu::VertexAttributeDescriptor {
-						offset: memoffset::offset_of!(ColorVertex, color)
-							as wgpu::BufferAddress,
-						format: wgpu::VertexFormat::Float3,
-						shader_location: 1,
-					},
-				],
-			}],
+			vertex_state: wgpu::VertexStateDescriptor {
+				index_format: VertexIndex::<ColorVertex>::WGPU_FORMAT,
+				vertex_buffers: &[wgpu::VertexBufferDescriptor {
+					stride: std::mem::size_of::<ColorVertex>()
+						as wgpu::BufferAddress,
+					step_mode: wgpu::InputStepMode::Vertex,
+					attributes: &[
+						wgpu::VertexAttributeDescriptor {
+							offset: memoffset::offset_of!(ColorVertex, pos)
+								as wgpu::BufferAddress,
+							format: wgpu::VertexFormat::Float2,
+							shader_location: 0,
+						},
+						wgpu::VertexAttributeDescriptor {
+							offset: memoffset::offset_of!(ColorVertex, color)
+								as wgpu::BufferAddress,
+							format: wgpu::VertexFormat::Float3,
+							shader_location: 1,
+						},
+					],
+				}],
+			},
 			sample_count: 1,
 			sample_mask: !0,
 			alpha_to_coverage_enabled: false,
@@ -167,24 +171,27 @@ fn create_texture_pipeline(
 
 	let bind_group_layout =
 		device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+			label: None,
 			bindings: &[
-				wgpu::BindGroupLayoutBinding {
+				wgpu::BindGroupLayoutEntry {
 					binding: 1,
 					visibility: wgpu::ShaderStage::FRAGMENT,
 					ty: wgpu::BindingType::SampledTexture {
 						multisampled: false,
+						component_type: wgpu::TextureComponentType::Float,
 						dimension: wgpu::TextureViewDimension::D2,
 					},
 				},
-				wgpu::BindGroupLayoutBinding {
+				wgpu::BindGroupLayoutEntry {
 					binding: 2,
 					visibility: wgpu::ShaderStage::FRAGMENT,
-					ty: wgpu::BindingType::Sampler,
+					ty: wgpu::BindingType::Sampler { comparison: true },
 				},
 			],
 		});
 
 	let texture = device.create_texture(&wgpu::TextureDescriptor {
+		label: Some("evalvana_texture_atlas"),
 		size: tex_size.to_extent(),
 		sample_count: 1,
 		array_layer_count: 1,
@@ -203,10 +210,11 @@ fn create_texture_pipeline(
 		mipmap_filter: wgpu::FilterMode::Linear,
 		lod_min_clamp: 0.0,
 		lod_max_clamp: 0.0,
-		compare_function: wgpu::CompareFunction::Always,
+		compare: wgpu::CompareFunction::Always,
 	});
 
 	let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+		label: Some("evalvana_texture_pipeline_bind_group"),
 		layout: &bind_group_layout,
 		bindings: &[
 			wgpu::Binding {
@@ -261,26 +269,30 @@ fn create_texture_pipeline(
 				write_mask: wgpu::ColorWrite::ALL,
 			}],
 			depth_stencil_state: None,
-			index_format: VertexIndex::WGPU_FORMAT,
-			vertex_buffers: &[wgpu::VertexBufferDescriptor {
-				stride: std::mem::size_of::<TextureVertex>()
-					as wgpu::BufferAddress,
-				step_mode: wgpu::InputStepMode::Vertex,
-				attributes: &[
-					wgpu::VertexAttributeDescriptor {
-						offset: memoffset::offset_of!(TextureVertex, pos)
-							as wgpu::BufferAddress,
-						format: wgpu::VertexFormat::Float2,
-						shader_location: 0,
-					},
-					wgpu::VertexAttributeDescriptor {
-						offset: memoffset::offset_of!(TextureVertex, tex_coord)
-							as wgpu::BufferAddress,
-						format: wgpu::VertexFormat::Float2,
-						shader_location: 1,
-					},
-				],
-			}],
+			vertex_state: wgpu::VertexStateDescriptor {
+				index_format: VertexIndex::<TextureVertex>::WGPU_FORMAT,
+				vertex_buffers: &[wgpu::VertexBufferDescriptor {
+					stride: std::mem::size_of::<TextureVertex>()
+						as wgpu::BufferAddress,
+					step_mode: wgpu::InputStepMode::Vertex,
+					attributes: &[
+						wgpu::VertexAttributeDescriptor {
+							offset: memoffset::offset_of!(TextureVertex, pos)
+								as wgpu::BufferAddress,
+							format: wgpu::VertexFormat::Float2,
+							shader_location: 0,
+						},
+						wgpu::VertexAttributeDescriptor {
+							offset: memoffset::offset_of!(
+								TextureVertex,
+								tex_coord
+							) as wgpu::BufferAddress,
+							format: wgpu::VertexFormat::Float2,
+							shader_location: 1,
+						},
+					],
+				}],
+			},
 			sample_count: 1,
 			sample_mask: !0,
 			alpha_to_coverage_enabled: false,

@@ -1,7 +1,9 @@
 use crate::{
 	geometry::{ext::ScreenPixelPointExt, ScreenPixelPoint},
-	rendering::{color::Color, ColorVertex, VertexIndex},
+	rendering::{color::Color, ColorVertex, VertexIndex, VertexIndexInner},
 };
+
+use std::convert::TryInto;
 
 use lyon_tessellation::{
 	math::Point as LyonPoint, BasicGeometryBuilder as LyonBasicGeometryBuilder,
@@ -15,9 +17,9 @@ use winit::dpi::LogicalSize;
 
 pub(super) struct GeometryBuilder<'a> {
 	vertices: &'a mut Vec<ColorVertex>,
-	indices: &'a mut Vec<VertexIndex>,
-	vertex_offset: VertexIndex,
-	index_offset: VertexIndex,
+	indices: &'a mut Vec<VertexIndex<ColorVertex>>,
+	vertex_offset: VertexIndex<ColorVertex>,
+	index_offset: VertexIndex<ColorVertex>,
 
 	color: Color,
 	window_size: LogicalSize<u32>,
@@ -26,13 +28,13 @@ pub(super) struct GeometryBuilder<'a> {
 impl GeometryBuilder<'_> {
 	pub(super) fn new<'a>(
 		vertices: &'a mut Vec<ColorVertex>,
-		indices: &'a mut Vec<VertexIndex>,
+		indices: &'a mut Vec<VertexIndex<ColorVertex>>,
 		color: Color,
 		window_size: LogicalSize<u32>,
 	) -> GeometryBuilder<'a> {
 		GeometryBuilder {
-			vertex_offset: vertices.len() as VertexIndex,
-			index_offset: indices.len() as VertexIndex,
+			vertex_offset: vertices.len().try_into().unwrap(),
+			index_offset: indices.len().try_into().unwrap(),
 			vertices,
 			indices,
 			color,
@@ -43,20 +45,20 @@ impl GeometryBuilder<'_> {
 
 impl<'a> LyonGeometryBuilder for GeometryBuilder<'a> {
 	fn begin_geometry(&mut self) {
-		self.vertex_offset = self.vertices.len() as VertexIndex;
-		self.index_offset = self.indices.len() as VertexIndex;
+		self.vertex_offset = self.vertices.len().try_into().unwrap();
+		self.index_offset = self.indices.len().try_into().unwrap();
 	}
 
 	fn end_geometry(&mut self) -> Count {
 		Count {
-			vertices: self.vertices.len() as u32 - self.vertex_offset as u32,
-			indices: self.indices.len() as u32 - self.index_offset as u32,
+			vertices: self.vertices.len() as u32 - self.vertex_offset.to_u32(),
+			indices: self.indices.len() as u32 - self.index_offset.to_u32(),
 		}
 	}
 
 	fn abort_geometry(&mut self) {
-		self.vertices.truncate(self.vertex_offset as usize);
-		self.indices.truncate(self.index_offset as usize);
+		self.vertices.truncate(self.vertex_offset.to_usize());
+		self.indices.truncate(self.index_offset.to_usize());
 	}
 
 	fn add_triangle(
@@ -72,9 +74,21 @@ impl<'a> LyonGeometryBuilder for GeometryBuilder<'a> {
 		debug_assert!(b != LyonVertexId::INVALID);
 		debug_assert!(c != LyonVertexId::INVALID);
 
-		self.indices.push((a + self.vertex_offset as u32).into());
-		self.indices.push((b + self.vertex_offset as u32).into());
-		self.indices.push((c + self.vertex_offset as u32).into());
+		self.indices.push(
+			(a.offset() + self.vertex_offset.to_u32())
+				.try_into()
+				.unwrap(),
+		);
+		self.indices.push(
+			(b.offset() + self.vertex_offset.to_u32())
+				.try_into()
+				.unwrap(),
+		);
+		self.indices.push(
+			(c.offset() + self.vertex_offset.to_u32())
+				.try_into()
+				.unwrap(),
+		);
 	}
 }
 
@@ -88,10 +102,11 @@ impl<'a> LyonBasicGeometryBuilder for GeometryBuilder<'a> {
 		self.vertices.push(ColorVertex::new(pos, self.color));
 
 		let len = self.vertices.len();
-		if len > VertexIndex::max_value() as usize {
+		if len > VertexIndexInner::max_value() as usize {
 			Err(LyonGeometryBuilderError::TooManyVertices)
 		} else {
-			Ok(((len - 1) as VertexIndex - self.vertex_offset).into())
+			let len: u32 = len.try_into().unwrap();
+			Ok(((len - 1) - self.vertex_offset.to_u32()).into())
 		}
 	}
 }

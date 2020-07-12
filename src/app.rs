@@ -6,9 +6,8 @@ use crate::{
 	rendering::{color::Color, Renderer},
 };
 
-use std::time::{Duration, Instant};
-
-use wgpu_glyph::Scale as FontScale;
+use pollster::block_on;
+use wgpu_glyph::ab_glyph::PxScale as FontScale;
 use winit::{
 	dpi::LogicalSize,
 	event::{Event as WinitEvent, WindowEvent},
@@ -58,12 +57,14 @@ impl Default for App {
 				errors: Color::from_rgb_u32(0xFF4545),
 			},
 			font_settings: FontSettings {
-				ui_font_scale: FontScale::uniform(16.0),
-				editor_font_scale: FontScale::uniform(16.0),
+				ui_font_scale: FontScale::from(16.0),
+				editor_font_scale: FontScale::from(16.0),
 			},
 		};
 
 		let icons = Icons::default();
+
+		log::trace!("Creating event loop & window");
 
 		let event_loop = EventLoop::new();
 
@@ -76,13 +77,17 @@ impl Default for App {
 
 		App::set_scaled_icon(&window, &icons);
 
-		let mut renderer = Renderer::new(&window, &icons);
+		log::trace!("Creating renderer");
+
+		let mut renderer = block_on(Renderer::new(&window, &icons));
 
 		let mut updating_ctx = UpdatingContext::new(
 			&mut renderer.drawing_manager,
 			&window,
 			Event::Startup,
 		);
+
+		log::trace!("Creating interface");
 
 		let mut interface = Interface::new(&mut updating_ctx);
 
@@ -198,9 +203,8 @@ impl App {
 		let mut delta = App::target_delta(&monitor);
 
 		event_loop.run(move |event, _, control_flow| {
-			*control_flow = ControlFlow::WaitUntil(
-				Instant::now() + Duration::from_millis(delta as u64),
-			);
+			log::trace!("Processing event: {:?}", event);
+			*control_flow = ControlFlow::Poll;
 
 			match &event {
 				WinitEvent::MainEventsCleared => window.request_redraw(),

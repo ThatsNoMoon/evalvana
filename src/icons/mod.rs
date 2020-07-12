@@ -170,19 +170,17 @@ impl Icons {
 	) {
 		let byte_size = self.atlas_size.to_bytes();
 
-		let temp_buf = device
-			.create_buffer_mapped(
-				byte_size.area().try_into().unwrap(),
-				wgpu::BufferUsage::COPY_SRC,
-			)
-			.fill_from_slice(self.atlas.as_slice());
+		let temp_buf = device.create_buffer_with_data(
+			self.atlas.as_slice(),
+			wgpu::BufferUsage::COPY_SRC,
+		);
 
 		encoder.copy_buffer_to_texture(
 			wgpu::BufferCopyView {
 				buffer: &temp_buf,
 				offset: 0,
-				row_pitch: byte_size.width,
-				image_height: byte_size.height,
+				bytes_per_row: byte_size.width,
+				rows_per_image: byte_size.height,
 			},
 			wgpu::TextureCopyView {
 				texture,

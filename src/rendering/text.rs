@@ -1,36 +1,36 @@
 use std::borrow::Cow;
 
 use wgpu_glyph::{
-	rusttype::Font, FontId, GlyphBrush, GlyphBrushBuilder, VariedSection,
+	ab_glyph::FontRef, FontId, GlyphBrush, GlyphBrushBuilder, Section,
 };
 
-const EDITOR_FONT: &[u8] = include_bytes!(concat!(
+const EDITOR_FONT_BYTES: &[u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
 	"/assets/fonts/JetBrainsMono/JetBrainsMono-Regular.ttf"
 ));
 
-const UI_FONT: &[u8] = include_bytes!(concat!(
+const UI_FONT_BYTES: &[u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
 	"/assets/fonts/Roboto/Roboto-Regular.ttf"
 ));
 
-const UI_FONT_MEDIUM: &[u8] = include_bytes!(concat!(
+const UI_FONT_MEDIUM_BYTES: &[u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
 	"/assets/fonts/Roboto/Roboto-Medium.ttf"
 ));
 
-const UI_FONT_BOLD: &[u8] = include_bytes!(concat!(
+const UI_FONT_BOLD_BYTES: &[u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
 	"/assets/fonts/Roboto/Roboto-Bold.ttf"
 ));
 
-const UI_FONT_ITALIC: &[u8] = include_bytes!(concat!(
+const UI_FONT_ITALIC_BYTES: &[u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
 	"/assets/fonts/Roboto/Roboto-Italic.ttf"
 ));
 
 pub struct TextRenderer {
-	glyph_brush: GlyphBrush<'static, ()>,
+	glyph_brush: GlyphBrush<(), FontRef<'static>>,
 	editor_font: FontId,
 	ui_font: FontId,
 	ui_font_medium: FontId,
@@ -43,13 +43,19 @@ impl TextRenderer {
 		device: &mut wgpu::Device,
 		texture_format: wgpu::TextureFormat,
 	) -> TextRenderer {
-		let mut builder =
-			GlyphBrushBuilder::using_font_bytes(EDITOR_FONT).unwrap();
+		let editor_font = FontRef::try_from_slice(EDITOR_FONT_BYTES).unwrap();
+		let ui_font = FontRef::try_from_slice(UI_FONT_BYTES).unwrap();
+		let ui_font_medium =
+			FontRef::try_from_slice(UI_FONT_MEDIUM_BYTES).unwrap();
+		let ui_font_bold = FontRef::try_from_slice(UI_FONT_BOLD_BYTES).unwrap();
+		let ui_font_italic =
+			FontRef::try_from_slice(UI_FONT_ITALIC_BYTES).unwrap();
+		let mut builder = GlyphBrushBuilder::using_font(editor_font);
 
-		let ui_font = builder.add_font_bytes(UI_FONT);
-		let ui_font_medium = builder.add_font_bytes(UI_FONT_MEDIUM);
-		let ui_font_bold = builder.add_font_bytes(UI_FONT_BOLD);
-		let ui_font_italic = builder.add_font_bytes(UI_FONT_ITALIC);
+		let ui_font = builder.add_font(ui_font);
+		let ui_font_medium = builder.add_font(ui_font_medium);
+		let ui_font_bold = builder.add_font(ui_font_bold);
+		let ui_font_italic = builder.add_font(ui_font_italic);
 
 		TextRenderer {
 			glyph_brush: builder.build(device, texture_format),
@@ -61,10 +67,7 @@ impl TextRenderer {
 		}
 	}
 
-	pub fn queue<'a>(
-		&mut self,
-		section: impl Into<Cow<'a, VariedSection<'a>>>,
-	) {
+	pub fn queue<'a>(&mut self, section: impl Into<Cow<'a, Section<'a>>>) {
 		self.glyph_brush.queue(section);
 	}
 
@@ -105,7 +108,7 @@ impl TextRenderer {
 		self.ui_font_italic
 	}
 
-	pub fn font_data(&self, id: FontId) -> &Font {
+	pub fn font_data(&self, id: FontId) -> &FontRef {
 		&self.glyph_brush.fonts()[id.0]
 	}
 }

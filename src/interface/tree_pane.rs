@@ -98,12 +98,12 @@ impl PaneStatus {
 						self.drawn_bounds = None;
 						ActionData::RequestRedraw.into()
 					} else {
-						Action::None
+						Action::none()
 					}
 				}
-				None => Action::None,
+				None => Action::none(),
 			},
-			_ => Action::None,
+			_ => Action::none(),
 		}
 	}
 }
@@ -151,12 +151,12 @@ impl Evaluator {
 						self.drawn_bounds = None;
 						Action::from(ActionData::RequestRedraw)
 					} else {
-						Action::None
+						Action::none()
 					}
 				}
-				None => Action::None,
+				None => Action::none(),
 			},
-			_ => Action::None,
+			_ => Action::none(),
 		}
 	}
 }
