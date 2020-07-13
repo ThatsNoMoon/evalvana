@@ -433,7 +433,7 @@ impl Renderer {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct ColorVertex {
 	pos: ScreenNormPoint,
 	color: Color,
@@ -452,7 +452,7 @@ unsafe impl Zeroable for ColorVertex {}
 unsafe impl Pod for ColorVertex {}
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct TextureVertex {
 	pos: ScreenNormPoint,
 	tex_coord: TexNormPoint,

@@ -7,6 +7,8 @@ use super::{
 
 use crate::geometry::{ext::TexPixelSizeExt, TexPixelSize};
 
+use bytemuck::offset_of;
+
 const TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 
 #[derive(Debug)]
@@ -130,14 +132,20 @@ fn create_color_pipeline(
 					step_mode: wgpu::InputStepMode::Vertex,
 					attributes: &[
 						wgpu::VertexAttributeDescriptor {
-							offset: memoffset::offset_of!(ColorVertex, pos)
-								as wgpu::BufferAddress,
+							offset: offset_of!(
+								ColorVertex::default(),
+								ColorVertex,
+								pos
+							) as wgpu::BufferAddress,
 							format: wgpu::VertexFormat::Float2,
 							shader_location: 0,
 						},
 						wgpu::VertexAttributeDescriptor {
-							offset: memoffset::offset_of!(ColorVertex, color)
-								as wgpu::BufferAddress,
+							offset: offset_of!(
+								ColorVertex::default(),
+								ColorVertex,
+								color
+							) as wgpu::BufferAddress,
 							format: wgpu::VertexFormat::Float3,
 							shader_location: 1,
 						},
@@ -280,13 +288,17 @@ fn create_texture_pipeline(
 					step_mode: wgpu::InputStepMode::Vertex,
 					attributes: &[
 						wgpu::VertexAttributeDescriptor {
-							offset: memoffset::offset_of!(TextureVertex, pos)
-								as wgpu::BufferAddress,
+							offset: offset_of!(
+								TextureVertex::default(),
+								TextureVertex,
+								pos
+							) as wgpu::BufferAddress,
 							format: wgpu::VertexFormat::Float2,
 							shader_location: 0,
 						},
 						wgpu::VertexAttributeDescriptor {
-							offset: memoffset::offset_of!(
+							offset: offset_of!(
+								TextureVertex::default(),
 								TextureVertex,
 								tex_coord
 							) as wgpu::BufferAddress,
