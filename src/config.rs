@@ -1,3 +1,6 @@
+// Copyright 2020 Benjamin Scherer
+// Licensed under the Open Software License version 3.0
+
 use crate::rendering::color::Color;
 
 use wgpu_glyph::ab_glyph::PxScale as FontScale;

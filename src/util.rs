@@ -1,3 +1,6 @@
+// Copyright 2020 Benjamin Scherer
+// Licensed under the Open Software License version 3.0
+
 use crossbeam_channel::{unbounded as unbounded_channel, Receiver, Sender};
 
 use std::fmt::Display;

@@ -1,3 +1,6 @@
+// Copyright 2020 Benjamin Scherer
+// Licensed under the Open Software License version 3.0
+
 #![allow(dead_code, unused_imports)]
 
 pub mod app;

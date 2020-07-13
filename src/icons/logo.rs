@@ -1,3 +1,6 @@
+// Copyright 2020 Benjamin Scherer
+// Licensed under the Open Software License version 3.0
+
 const LOGO_16: &[u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
 	"/assets/icons/logo/logo_16.png"

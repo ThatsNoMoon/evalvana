@@ -1,3 +1,6 @@
+// Copyright 2020 Benjamin Scherer
+// Licensed under the Open Software License version 3.0
+
 use crate::{
 	geometry::{ext::ScreenPixelPointExt, ScreenPixelPoint},
 	rendering::{color::Color, ColorVertex, VertexIndex, VertexIndexInner},

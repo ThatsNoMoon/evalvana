@@ -1,3 +1,6 @@
+// Copyright 2020 Benjamin Scherer
+// Licensed under the Open Software License version 3.0
+
 use crate::{
 	config::{Config, EditorColors, FontSettings, UiColors},
 	events::Event,
