@@ -185,7 +185,7 @@ impl DrawingManager {
 		&mut self,
 		id: &DrawingId,
 	) -> Option<&mut DrawingBuffers> {
-		let idx = id.0.inner as usize;
+		let idx = *id.0 as usize;
 		self.buffers.get_mut(idx).and_then(|buffer_entry| {
 			buffer_entry.drawing_buffers.get_occupied_mut()
 		})
@@ -195,7 +195,7 @@ impl DrawingManager {
 		&mut self,
 		id: &DrawingId,
 	) -> Option<&mut TextQueue> {
-		let idx = id.0.inner as usize;
+		let idx = *id.0 as usize;
 		self.buffers
 			.get_mut(idx)
 			.map(|buffer_entry| &mut buffer_entry.text_queue)
@@ -250,7 +250,7 @@ impl DrawingManager {
 
 	pub fn clear(&mut self, id: &DrawingId) {
 		self.buffers
-			.get_mut(id.0.inner as usize)
+			.get_mut(*id.0 as usize)
 			.expect("Attempted to clear nonexistent buffers")
 			.clear();
 	}

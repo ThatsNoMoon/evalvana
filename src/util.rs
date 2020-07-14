@@ -3,34 +3,62 @@
 
 use crossbeam_channel::{unbounded as unbounded_channel, Receiver, Sender};
 
-use std::fmt::Display;
+use std::{
+	fmt::Debug,
+	mem::ManuallyDrop,
+	ops::{Deref, DerefMut},
+};
 
 #[derive(Debug)]
-pub struct Id<T: Display + Copy> {
-	pub inner: T,
+pub struct Id<T: Debug> {
+	inner: ManuallyDrop<T>,
 	id_relinquisher: Sender<T>,
 }
 
-impl<T: PartialEq + Display + Copy> PartialEq for Id<T> {
+impl<T: Debug> Id<T> {
+	fn new(inner: T, id_relinquisher: Sender<T>) -> Self {
+		Id {
+			inner: ManuallyDrop::new(inner),
+			id_relinquisher,
+		}
+	}
+}
+
+impl<T: PartialEq + Debug> PartialEq for Id<T> {
 	fn eq(&self, other: &Id<T>) -> bool {
 		self.inner == other.inner
 			&& self.id_relinquisher.same_channel(&other.id_relinquisher)
 	}
 }
 
-impl<T: Eq + Display + Copy> Eq for Id<T> {}
+impl<T: Eq + Debug> Eq for Id<T> {}
 
-impl<T: Display + Copy> Drop for Id<T> {
+impl<T: Debug> Drop for Id<T> {
 	fn drop(&mut self) {
-		self.id_relinquisher
-			.try_send(self.inner)
-			.unwrap_or_else(|err| {
+		let id = unsafe { ManuallyDrop::take(&mut self.inner) };
+		self.id_relinquisher.try_send(id).unwrap_or_else(|err| {
+			if log::log_enabled!(log::Level::Debug) {
+				let msg = format!("{}", err);
 				log::debug!(
-					"Failed to relinquish DrawingId {}: {}",
+					"Failed to relinquish Id {:?}: {}",
 					err.into_inner(),
-					err,
-				)
-			});
+					msg
+				);
+			}
+		});
+	}
+}
+
+impl<T: Debug> Deref for Id<T> {
+	type Target = T;
+	fn deref(&self) -> &Self::Target {
+		&*self.inner
+	}
+}
+
+impl<T: Debug> DerefMut for Id<T> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut *self.inner
 	}
 }
 
@@ -50,13 +78,10 @@ impl<T> Default for IdManager<T> {
 	}
 }
 
-impl<T: Display + Copy> IdManager<T> {
+impl<T: Debug> IdManager<T> {
 	pub fn create_id(&mut self, id: T) -> Id<T> {
 		let id_relinquisher = self.id_relinquisher.clone();
-		Id {
-			inner: id,
-			id_relinquisher,
-		}
+		Id::new(id, id_relinquisher)
 	}
 	pub fn reclaimed_ids(&mut self) -> impl Iterator<Item = T> + '_ {
 		std::iter::successors(self.id_reclaimer.try_recv().ok(), move |_| {
