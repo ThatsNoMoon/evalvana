@@ -10,6 +10,10 @@ The goal of evalvana is to be able to provide a clean, powerful REPL environment
 
 The point of evalvana is to improve the REPL experience beyond a barebones text environment in a CLI. Features like autocomplete and intellisense would be nice, but the priority is less on IDE-like features and more on REPL-specific features such as hovering over variables to inspect their value, and being able to easily transition from using a REPL to using a file (something most REPLs are sorely lacking).
 
+## Building
+
+Evalvana requires [Cargo](https://rustup.rs/), [CMake](https://cmake.org/download/), [Ninja](https://ninja-build.org/), and [Python 3](https://www.python.org/downloads/) to build. CMake, Ninja, and Python 3 must be in a folder in your PATH environment variable. After that, `cargo build` should handle building.
+
 ## License
 
 Evalvana is licensed under the [OSL 3.0](https://choosealicense.com/licenses/osl-3.0/). Derivatives must be licensed under OSL 3.0, but this does not include any linking restrictions; you may link this code to closed-source code.
