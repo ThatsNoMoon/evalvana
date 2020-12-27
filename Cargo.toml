@@ -9,22 +9,5 @@ license = "OSL-3.0"
 edition = "2018"
 
 [dependencies]
-winit = "0.22"
-wgpu = "0.5"
-pollster = "0.2"
-crossbeam-channel = "0.4"
-env_logger = "0.7"
-log = "0.4"
-bytemuck = "1"
-wgpu_glyph = "0.9"
-glyph_brush = "0.7"
-image = "0.23"
-euclid = "0.20"
-num-traits = "0.2"
-static_assertions = "1.1"
-lyon_tessellation = "0.15"
-cfg-if = "0.1"
-tinyvec = { version = "0.4.0-alpha.2", features = ["alloc"] }
-
-[build-dependencies]
-shaderc = "0.6"
+iced = "0.2"
+env_logger = "0.8"
