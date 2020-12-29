@@ -2,8 +2,7 @@
 // Licensed under the Open Software License version 3.0
 
 use iced::{
-	widget::container, Background, Color, Column, Container, Element, Length,
-	Row, Sandbox, Settings, Space,
+	Color, Column, Container, Element, Length, Row, Sandbox, Settings, Space,
 };
 
 pub mod color;
@@ -91,17 +90,8 @@ impl Sandbox for State {
 
 	fn view(&mut self) -> Element<'_, Self::Message> {
 		let sidebar = EnvironmentInfo::view_list(&mut self.envs, &self.config);
-		let sidebar_style = container::Style {
-			background: Some(Background::Color(
-				self.config.ui_colors.secondary_bg,
-			)),
-			..Default::default()
-		};
-		let sidebar_style = ContainerStyle {
-			style: sidebar_style,
-		};
 		let sidebar = Container::new(sidebar)
-			.style(sidebar_style)
+			.style(style::container::SecondaryBg::from(&self.config))
 			.width(Length::Units(230))
 			.height(Length::Fill)
 			.padding(15)
@@ -138,14 +128,4 @@ fn main() {
 	env_logger::init();
 
 	State::run(Settings::default()).expect("Failed to run app");
-}
-
-struct ContainerStyle {
-	style: container::Style,
-}
-
-impl container::StyleSheet for ContainerStyle {
-	fn style(&self) -> container::Style {
-		self.style
-	}
 }

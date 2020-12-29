@@ -198,4 +198,25 @@ pub mod container {
 			}
 		}
 	}
+
+	pub struct SecondaryBg {
+		bg: Color,
+	}
+
+	impl From<&'_ Config> for SecondaryBg {
+		fn from(config: &Config) -> Self {
+			Self {
+				bg: config.ui_colors.secondary_bg,
+			}
+		}
+	}
+
+	impl ContainerStyleSheet for SecondaryBg {
+		fn style(&self) -> Style {
+			Style {
+				background: Some(Background::Color(self.bg)),
+				..Style::default()
+			}
+		}
+	}
 }
