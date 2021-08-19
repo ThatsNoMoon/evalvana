@@ -1,20 +1,16 @@
-// Copyright 2020 Benjamin Scherer
+// Copyright 2021 ThatsNoMoon
 // Licensed under the Open Software License version 3.0
 
-use crate::{
-	config::Config,
-	message::Message,
-	style::{self, button::ButtonStyleSheet},
-};
-use iced::{
-	button, Button, Column, Container, Element, Length, Row, Space, Text,
-};
+use crate::{assets::font, config::Config, message::Message, style::{self, button::ButtonStyleSheet, text_input::TextInputStyleSheet}};
+use iced::{Button, Column, Container, Element, Length, Row, Space, Text, TextInput, button, text_input};
 
 #[derive(Debug)]
 pub struct Tab {
 	pub env: Environment,
 	tab_button_state: button::State,
 	close_button_state: button::State,
+	input_state: text_input::State,
+	pub contents: String,
 }
 
 impl Tab {
@@ -23,6 +19,8 @@ impl Tab {
 			env,
 			tab_button_state: button::State::new(),
 			close_button_state: button::State::new(),
+			input_state: text_input::State::focused(),
+			contents: String::new(),
 		}
 	}
 
@@ -39,7 +37,8 @@ impl Tab {
 				} else {
 					config.ui_colors.unfocused_text
 				})
-				.size(config.text_settings.ui_font_size);
+				.size(config.text_settings.ui_font_size)
+				.font(font::BODY);
 
 			let label = Container::new(label).height(Length::Fill).center_y();
 
@@ -81,11 +80,17 @@ impl Tab {
 				.into();
 
 		if is_active {
-			let text =
-				Text::new(format!("Such {} tab, much eval", self.env.id.name))
-					.size(config.text_settings.editor_font_size)
-					.color(config.editor_colors.main);
-			let contents = Container::new(text)
+			let input = TextInput::new(
+				&mut self.input_state,
+				"",
+				&self.contents,
+				move |contents| Message::NewContents(index, contents),
+			)
+			.size(config.text_settings.editor_font_size)
+			.style(Box::new(style::text_input::Editor::from(config))
+				as Box<dyn TextInputStyleSheet + 'static>)
+			.font(font::MONO);
+			let contents = Container::new(input)
 				.padding(50)
 				.style(style::container::UiBg::from(config))
 				.width(Length::Fill)
@@ -196,7 +201,8 @@ impl EnvironmentInfo {
 		let header = {
 			let text = Text::new("Available REPLs")
 				.size(config.text_settings.header_font_size)
-				.color(config.ui_colors.accent);
+				.color(config.ui_colors.accent)
+				.font(font::BODY);
 
 			Container::new(text)
 				.center_x()

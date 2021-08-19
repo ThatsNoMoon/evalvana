@@ -1,4 +1,4 @@
-// Copyright 2020 Benjamin Scherer
+// Copyright 2021 ThatsNoMoon
 // Licensed under the Open Software License version 3.0
 
 use iced::Color;
@@ -47,6 +47,7 @@ impl Default for UiColors {
 pub struct EditorColors {
 	pub bg: Color,
 	pub main: Color,
+	pub selection: Color,
 	pub gutter: Color,
 	pub strings: Color,
 	pub numbers: Color,
@@ -68,6 +69,7 @@ impl Default for EditorColors {
 		Self {
 			bg: Color::from_rgb32(0x282C34),
 			main: Color::from_rgb32(0xABB2BF),
+			selection: Color::from_rgba8(0x61, 0xAF, 0xEF, 0.3),
 			gutter: Color::from_rgb32(0x838891),
 			strings: Color::from_rgb32(0x98C379),
 			numbers: Color::from_rgb32(0xD19A66),

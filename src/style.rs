@@ -1,3 +1,56 @@
+// Copyright 2021 ThatsNoMoon
+// Licensed under the Open Software License version 3.0
+
+pub mod text_input {
+	use crate::config::{Config, EditorColors};
+	use iced::{Background, Color, text_input::Style};
+
+	pub use iced::text_input::StyleSheet as TextInputStyleSheet;
+
+	pub struct Editor {
+		colors: EditorColors,
+	}
+
+	impl From<&'_ Config> for Editor {
+		fn from(config: &Config) -> Self {
+			Self {
+				colors: config.editor_colors.clone(),
+			}
+		}
+	}
+
+	impl TextInputStyleSheet for Editor {
+		fn active(&self) -> Style {
+			Style {
+				background: Background::Color(self.colors.bg),
+				border_radius: 0.0,
+				border_width: 0.0,
+				border_color: Color::TRANSPARENT,
+			}
+		}
+
+		fn focused(&self) -> Style {
+			self.active()
+		}
+
+		fn placeholder_color(&self) -> iced::Color {
+			self.colors.main
+		}
+
+		fn value_color(&self) -> iced::Color {
+			self.colors.main
+		}
+
+		fn selection_color(&self) -> iced::Color {
+			self.colors.selection
+		}
+
+		fn hovered(&self) -> Style {
+	        self.active()
+	    }
+	}
+}
+
 pub mod button {
 	use crate::config::{Config, UiColors};
 	use iced::{button::Style, Background};

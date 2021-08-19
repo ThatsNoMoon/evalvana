@@ -1,10 +1,11 @@
-// Copyright 2020 Benjamin Scherer
+// Copyright 2021 ThatsNoMoon
 // Licensed under the Open Software License version 3.0
 
 use iced::{
 	Color, Column, Container, Element, Length, Row, Sandbox, Settings, Space,
 };
 
+pub mod assets;
 pub mod color;
 pub mod config;
 pub mod message;
@@ -84,6 +85,12 @@ impl Sandbox for State {
 					tabs.active_tab =
 						tabs.active_tab.checked_sub(1).unwrap_or(0);
 				}
+			}
+
+			Message::NewContents(tab, contents) => {
+				let tabs = self.tabs.as_mut().unwrap();
+
+				tabs.tabs[tab].contents = contents;
 			}
 		}
 	}
