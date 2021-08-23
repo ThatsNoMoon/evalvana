@@ -1,0 +1,12 @@
+[package]
+name = "evalvana-plugin-cargo"
+version = "0.1.0-alpha.1"
+authors = ["ThatsNoMoon <git@thatsnomoon.dev>"]
+repository = "https://github.com/ThatsNoMoon/evalvana"
+description = "Evalvana plugin for evaluating Rust code through Cargo"
+license = "0BSD"
+edition = "2018"
+
+[dependencies]
+evalvana-api = { path = "../api" }
+serde_json = "1.0"

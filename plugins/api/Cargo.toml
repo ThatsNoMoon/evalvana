@@ -1,0 +1,11 @@
+[package]
+name = "evalvana-api"
+version = "0.1.0-alpha.1"
+authors = ["ThatsNoMoon <git@thatsnomoon.dev>"]
+repository = "https://github.com/ThatsNoMoon/evalvana"
+description = "Rust types for the Evalvana plugin JSON RPC API"
+license = "OSL-3.0"
+edition = "2018"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
