@@ -1,0 +1,5 @@
+{
+	"name": "Cargo",
+	"program": "./evalvana-plugin-cargo",
+	"args": []
+}
