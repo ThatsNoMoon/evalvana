@@ -3,7 +3,7 @@
 
 pub mod text_input {
 	use crate::config::{Config, EditorColors};
-	use iced::{Background, Color, text_input::Style};
+	use iced::{text_input::Style, Background, Color};
 
 	pub use iced::text_input::StyleSheet as TextInputStyleSheet;
 
@@ -46,8 +46,8 @@ pub mod text_input {
 		}
 
 		fn hovered(&self) -> Style {
-	        self.active()
-	    }
+			self.active()
+		}
 	}
 }
 
