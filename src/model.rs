@@ -187,14 +187,61 @@ impl Tab {
 	}
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Tabs {
-	pub tabs: Vec<Tab>,
-	pub active_tab: usize,
+	tabs: Vec<Tab>,
+	active_tab: usize,
 }
 
 impl Tabs {
+	pub fn push(&mut self, tab: Tab) {
+		self.tabs.push(tab);
+		self.active_tab = self.tabs.len() - 1;
+	}
+
+	pub fn remove(&mut self, index: usize) {
+		self.tabs.remove(index);
+		self.active_tab = self.active_tab.saturating_sub(1);
+	}
+
+	pub fn iter(&self) -> impl Iterator<Item = &Tab> {
+		self.tabs.iter()
+	}
+
+	pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Tab> {
+		self.tabs.iter_mut()
+	}
+
+	pub fn set_active(&mut self, index: usize) {
+		if index >= self.tabs.len() {
+			panic!(
+				"Index {} out of bounds for tab list of length {}",
+				index,
+				self.tabs.len()
+			);
+		}
+		self.active_tab = index;
+	}
+
 	pub fn view<'s>(&'s mut self, config: &Config) -> Element<'s, Message> {
+		if self.tabs.is_empty() {
+			let handles_placeholder = Space::new(Length::Fill, Length::Fill);
+			let handles_placeholder = Container::new(handles_placeholder)
+				.width(Length::Fill)
+				.height(Length::Units(40))
+				.style(style::container::TabBg::from(config));
+
+			let content_placeholder = Space::new(Length::Fill, Length::Fill);
+			let content_placeholder = Container::new(content_placeholder)
+				.style(style::container::TabBg::from(config));
+
+			return Column::with_children(vec![
+				handles_placeholder.into(),
+				content_placeholder.into(),
+			])
+			.into();
+		}
+
 		let active_tab = self.active_tab;
 		let mut content = None;
 		let handles = self.tabs.iter_mut().enumerate().fold(
@@ -218,7 +265,27 @@ impl Tabs {
 			.width(Length::Fill)
 			.align_y(iced::Align::End);
 
-		Column::new().push(handles).push(content.unwrap()).into()
+		Column::new()
+			.push(handles)
+			.push(content.expect(
+				"Active tab index out of bounds, \
+				or active tab produced no content",
+			))
+			.into()
+	}
+}
+
+impl std::ops::Index<usize> for Tabs {
+	type Output = Tab;
+
+	fn index(&self, index: usize) -> &Self::Output {
+		&self.tabs[index]
+	}
+}
+
+impl std::ops::IndexMut<usize> for Tabs {
+	fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+		&mut self.tabs[index]
 	}
 }
 

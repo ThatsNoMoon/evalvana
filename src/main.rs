@@ -8,8 +8,8 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::{anyhow, Context as _, Error};
 use futures::{executor::block_on, FutureExt};
 use iced::{
-	Application, Clipboard, Color, Column, Command, Container, Element, Length,
-	Row, Settings, Space, Subscription,
+	Application, Clipboard, Color, Command, Container, Element, Length, Row,
+	Settings, Space, Subscription,
 };
 use lazy_regex::{regex_captures, regex_is_match};
 
@@ -30,7 +30,7 @@ use crate::{
 
 #[derive(Debug, Default)]
 pub struct State {
-	pub tabs: Option<Tabs>,
+	pub tabs: Tabs,
 	pub plugin_listings: Vec<PluginListing>,
 	pub plugins: HashMap<Arc<str>, Plugin>,
 	pub config: Config,
@@ -176,49 +176,28 @@ impl Application for State {
 
 				self.running_envs.push(output);
 
-				match &mut self.tabs {
-					Some(tabs) => {
-						tabs.tabs.push(tab);
-						tabs.active_tab = tabs.tabs.len() - 1;
-					}
-					None => {
-						self.tabs = Some(Tabs {
-							tabs: vec![tab],
-							active_tab: 0,
-						});
-					}
-				}
+				self.tabs.push(tab);
 
 				Command::none()
 			}
 
 			Message::SwitchTab(index) => {
-				self.tabs.as_mut().unwrap().active_tab = index;
+				self.tabs.set_active(index);
 				Command::none()
 			}
 
 			Message::CloseTab(index) => {
-				let tabs = self.tabs.as_mut().unwrap();
-				tabs.tabs.remove(index);
-
-				if tabs.tabs.is_empty() {
-					self.tabs = None;
-				} else {
-					tabs.active_tab =
-						tabs.active_tab.saturating_sub(1);
-				}
+				self.tabs.remove(index);
 				Command::none()
 			}
 
 			Message::NewContents(tab, contents) => {
-				let tabs = self.tabs.as_mut().unwrap();
-
-				tabs.tabs[tab].contents = contents;
+				self.tabs[tab].contents = contents;
 				Command::none()
 			}
 
 			Message::Eval(tab) => {
-				let tab = &mut self.tabs.as_mut().unwrap().tabs[tab];
+				let tab = &mut self.tabs[tab];
 				let code = tab.contents.to_owned();
 				let env = tab.env.clone();
 
@@ -227,7 +206,7 @@ impl Application for State {
 			}
 
 			Message::EvalComplete(env, _seq, results) => {
-				match self.tabs.as_mut().unwrap().tabs.iter_mut().find(|tab| *block_on(tab.env.read()).id == *env) {
+				match self.tabs.iter_mut().find(|tab| *block_on(tab.env.read()).id == *env) {
 					Some(t) => t.results = results,
 					None => eprintln!("Received eval results for an environment with no tab: {}", env),
 				}
@@ -311,28 +290,7 @@ impl Application for State {
 			.padding(15)
 			.into();
 
-		let content: Element<_> = match &mut self.tabs {
-			Some(tabs) => tabs.view(&self.config),
-			None => {
-				let handles_placeholder =
-					Space::new(Length::Fill, Length::Fill);
-				let handles_placeholder = Container::new(handles_placeholder)
-					.width(Length::Fill)
-					.height(Length::Units(40))
-					.style(style::container::TabBg::from(&self.config));
-
-				let content_placeholder =
-					Space::new(Length::Fill, Length::Fill);
-				let content_placeholder = Container::new(content_placeholder)
-					.style(style::container::TabBg::from(&self.config));
-
-				Column::with_children(vec![
-					handles_placeholder.into(),
-					content_placeholder.into(),
-				])
-				.into()
-			}
-		};
+		let content = self.tabs.view(&self.config);
 
 		Row::with_children(vec![sidebar, content]).into()
 	}
