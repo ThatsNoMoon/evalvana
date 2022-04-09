@@ -1,13 +1,13 @@
 // Copyright 2021 ThatsNoMoon
 // Licensed under the Open Software License version 3.0
 
-pub mod text_input {
-	pub use iced::text_input::StyleSheet as TextInputStyleSheet;
+pub(crate) mod text_input {
+	pub(crate) use iced::text_input::StyleSheet as TextInputStyleSheet;
 	use iced::{text_input::Style, Background, Color};
 
 	use crate::config::{Config, EditorColors};
 
-	pub struct Editor {
+	pub(crate) struct Editor {
 		colors: EditorColors,
 	}
 
@@ -51,17 +51,17 @@ pub mod text_input {
 	}
 }
 
-pub mod button {
-	pub use iced::button::StyleSheet as ButtonStyleSheet;
+pub(crate) mod button {
+	pub(crate) use iced::button::StyleSheet as ButtonStyleSheet;
 	use iced::{button::Style, Background};
 
 	use crate::config::{Config, UiColors};
 
-	pub struct Primary {
+	pub(crate) struct Primary {
 		ui_colors: UiColors,
 	}
 
-	pub struct Secondary {
+	pub(crate) struct Secondary {
 		ui_colors: UiColors,
 	}
 
@@ -139,7 +139,7 @@ pub mod button {
 	}
 }
 
-pub mod tab {
+pub(crate) mod tab {
 	use iced::{
 		button::{Style, StyleSheet as ButtonStyleSheet},
 		Background, Color,
@@ -147,12 +147,12 @@ pub mod tab {
 
 	use crate::config::{Config, UiColors};
 
-	pub struct Active {
+	pub(crate) struct Active {
 		ui_colors: UiColors,
 		editor_bg: Color,
 	}
 
-	pub struct Inactive {
+	pub(crate) struct Inactive {
 		ui_colors: UiColors,
 	}
 
@@ -204,7 +204,7 @@ pub mod tab {
 	}
 }
 
-pub mod container {
+pub(crate) mod container {
 	use iced::{
 		container::{Style, StyleSheet as ContainerStyleSheet},
 		Background, Color,
@@ -212,7 +212,7 @@ pub mod container {
 
 	use crate::config::Config;
 
-	pub struct TabBg {
+	pub(crate) struct TabBg {
 		bg: Color,
 	}
 
@@ -233,7 +233,7 @@ pub mod container {
 		}
 	}
 
-	pub struct UiBg {
+	pub(crate) struct UiBg {
 		bg: Color,
 	}
 
@@ -254,7 +254,7 @@ pub mod container {
 		}
 	}
 
-	pub struct SecondaryBg {
+	pub(crate) struct SecondaryBg {
 		bg: Color,
 	}
 

@@ -19,19 +19,19 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct Tab {
-	pub env: Arc<RwLock<Environment>>,
+pub(crate) struct Tab {
+	pub(crate) env: Arc<RwLock<Environment>>,
 	plugin_name: Arc<str>,
 	tab_button_state: button::State,
 	close_button_state: button::State,
 	input_state: text_input::State,
 	eval_button_state: button::State,
-	pub contents: String,
-	pub results: Vec<EvalResult>,
+	pub(crate) contents: String,
+	pub(crate) results: Vec<EvalResult>,
 }
 
 impl Tab {
-	pub fn new(env: Environment) -> Self {
+	pub(crate) fn new(env: Environment) -> Self {
 		let plugin_name = env.plugin_name.clone();
 		Self {
 			env: Arc::new(RwLock::new(env)),
@@ -45,7 +45,7 @@ impl Tab {
 		}
 	}
 
-	pub fn view<'s>(
+	pub(crate) fn view<'s>(
 		&'s mut self,
 		config: &Config,
 		is_active: bool,
@@ -189,31 +189,28 @@ impl Tab {
 }
 
 #[derive(Debug, Default)]
-pub struct Tabs {
+pub(crate) struct Tabs {
 	tabs: Vec<Tab>,
 	active_tab: usize,
 }
 
 impl Tabs {
-	pub fn push(&mut self, tab: Tab) {
+	pub(crate) fn push(&mut self, tab: Tab) {
 		self.tabs.push(tab);
 		self.active_tab = self.tabs.len() - 1;
 	}
 
-	pub fn remove(&mut self, index: usize) {
-		self.tabs.remove(index);
+	pub(crate) fn remove(&mut self, index: usize) -> Tab {
+		let tab = self.tabs.remove(index);
 		self.active_tab = self.active_tab.saturating_sub(1);
+		tab
 	}
 
-	pub fn iter(&self) -> impl Iterator<Item = &Tab> {
-		self.tabs.iter()
-	}
-
-	pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Tab> {
+	pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = &mut Tab> {
 		self.tabs.iter_mut()
 	}
 
-	pub fn set_active(&mut self, index: usize) {
+	pub(crate) fn set_active(&mut self, index: usize) {
 		if index >= self.tabs.len() {
 			panic!(
 				"Index {} out of bounds for tab list of length {}",
@@ -224,7 +221,7 @@ impl Tabs {
 		self.active_tab = index;
 	}
 
-	pub fn view<'s>(&'s mut self, config: &Config) -> Element<'s, Message> {
+	pub(crate) fn view<'s>(&'s mut self, config: &Config) -> Element<'s, Message> {
 		if self.tabs.is_empty() {
 			let handles_placeholder = Space::new(Length::Fill, Length::Fill);
 			let handles_placeholder = Container::new(handles_placeholder)
@@ -291,20 +288,20 @@ impl std::ops::IndexMut<usize> for Tabs {
 }
 
 #[derive(Debug, Clone)]
-pub struct PluginListing {
-	pub name: Arc<str>,
+pub(crate) struct PluginListing {
+	pub(crate) name: Arc<str>,
 	button_state: button::State,
 }
 
 impl PluginListing {
-	pub fn new(name: Arc<str>) -> Self {
+	pub(crate) fn new(name: Arc<str>) -> Self {
 		Self {
 			name,
 			button_state: button::State::new(),
 		}
 	}
 
-	pub fn view<'s>(&'s mut self, config: &Config) -> Element<'s, Message> {
+	pub(crate) fn view<'s>(&'s mut self, config: &Config) -> Element<'s, Message> {
 		let text = Text::new(&*self.name)
 			.size(config.text_settings.ui_font_size)
 			.color(config.ui_colors.text);
@@ -323,7 +320,7 @@ impl PluginListing {
 			.into()
 	}
 
-	pub fn view_list<'s>(
+	pub(crate) fn view_list<'s>(
 		info: &'s mut [Self],
 		config: &Config,
 	) -> Element<'s, Message> {

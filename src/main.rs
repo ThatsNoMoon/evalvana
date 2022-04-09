@@ -13,13 +13,13 @@ use iced::{
 };
 use lazy_regex::{regex_captures, regex_is_match};
 
-pub mod assets;
-pub mod color;
-pub mod config;
-pub mod message;
-pub mod model;
-pub mod plugin;
-pub mod style;
+pub(crate) mod assets;
+pub(crate) mod color;
+pub(crate) mod config;
+pub(crate) mod message;
+pub(crate) mod model;
+pub(crate) mod plugin;
+pub(crate) mod style;
 
 use crate::{
 	config::Config,
@@ -29,11 +29,11 @@ use crate::{
 };
 
 #[derive(Debug, Default)]
-pub struct State {
-	pub tabs: Tabs,
-	pub plugin_listings: Vec<PluginListing>,
-	pub plugins: HashMap<Arc<str>, Plugin>,
-	pub config: Config,
+pub(crate) struct State {
+	pub(crate) tabs: Tabs,
+	pub(crate) plugin_listings: Vec<PluginListing>,
+	pub(crate) plugins: HashMap<Arc<str>, Plugin>,
+	pub(crate) config: Config,
 	running_envs: Vec<EnvironmentOutput>,
 	loaded: bool,
 }
@@ -208,8 +208,12 @@ impl Application for State {
 			}
 
 			Message::CloseTab(index) => {
-				self.tabs.remove(index);
-				Command::none()
+				let env = self.tabs.remove(index).env;
+				self.running_envs.remove(index);
+				
+				async move {
+					env.write().await.kill().await.into()
+				}.into()
 			}
 
 			Message::NewContents(tab, contents) => {

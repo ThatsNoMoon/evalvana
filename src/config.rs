@@ -6,24 +6,24 @@ use iced::Color;
 use crate::color::ColorExt;
 
 #[derive(Debug, Default, Clone, PartialEq)]
-pub struct Config {
-	pub ui_colors: UiColors,
-	pub editor_colors: EditorColors,
-	pub text_settings: TextSettings,
+pub(crate) struct Config {
+	pub(crate) ui_colors: UiColors,
+	pub(crate) editor_colors: EditorColors,
+	pub(crate) text_settings: TextSettings,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct UiColors {
-	pub bg: Color,
-	pub secondary_bg: Color,
-	pub hovered_bg: Color,
-	pub focused_bg: Color,
-	pub unfocused_bg: Color,
-	pub secondary_unfocused_bg: Color,
-	pub text: Color,
-	pub unfocused_text: Color,
-	pub accent: Color,
-	pub borders: Color,
+pub(crate) struct UiColors {
+	pub(crate) bg: Color,
+	pub(crate) secondary_bg: Color,
+	pub(crate) hovered_bg: Color,
+	pub(crate) focused_bg: Color,
+	pub(crate) unfocused_bg: Color,
+	pub(crate) secondary_unfocused_bg: Color,
+	pub(crate) text: Color,
+	pub(crate) unfocused_text: Color,
+	pub(crate) accent: Color,
+	pub(crate) borders: Color,
 }
 
 impl Default for UiColors {
@@ -44,24 +44,24 @@ impl Default for UiColors {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct EditorColors {
-	pub bg: Color,
-	pub main: Color,
-	pub selection: Color,
-	pub gutter: Color,
-	pub strings: Color,
-	pub numbers: Color,
-	pub operators: Color,
-	pub keywords: Color,
-	pub variables: Color,
-	pub parameters: Color,
-	pub constants: Color,
-	pub types: Color,
-	pub functions: Color,
+pub(crate) struct EditorColors {
+	pub(crate) bg: Color,
+	pub(crate) main: Color,
+	pub(crate) selection: Color,
+	pub(crate) gutter: Color,
+	pub(crate) strings: Color,
+	pub(crate) numbers: Color,
+	pub(crate) operators: Color,
+	pub(crate) keywords: Color,
+	pub(crate) variables: Color,
+	pub(crate) parameters: Color,
+	pub(crate) constants: Color,
+	pub(crate) types: Color,
+	pub(crate) functions: Color,
 
-	pub success: Color,
-	pub warnings: Color,
-	pub errors: Color,
+	pub(crate) success: Color,
+	pub(crate) warnings: Color,
+	pub(crate) errors: Color,
 }
 
 impl Default for EditorColors {
@@ -88,10 +88,10 @@ impl Default for EditorColors {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct TextSettings {
-	pub ui_font_size: u16,
-	pub editor_font_size: u16,
-	pub header_font_size: u16,
+pub(crate) struct TextSettings {
+	pub(crate) ui_font_size: u16,
+	pub(crate) editor_font_size: u16,
+	pub(crate) header_font_size: u16,
 }
 
 impl Default for TextSettings {

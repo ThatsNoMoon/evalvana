@@ -19,11 +19,11 @@ use tokio::{
 use tokio_stream::{wrappers::LinesStream, StreamExt};
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Plugin {
+pub(crate) struct Plugin {
 	#[serde(deserialize_with = "deserialize_plugin_name")]
-	pub name: Arc<str>,
-	pub program: PathBuf,
-	pub args: Vec<String>,
+	pub(crate) name: Arc<str>,
+	pub(crate) program: PathBuf,
+	pub(crate) args: Vec<String>,
 	#[serde(skip)]
 	env_seq: u32,
 }
@@ -49,9 +49,9 @@ where
 }
 
 impl Plugin {
-	pub fn open(&mut self) -> Result<(Environment, EnvironmentOutput)> {
+	pub(crate) fn open(&mut self) -> Result<(Environment, EnvironmentOutput)> {
 		let mut child = Command::new(&self.program)
-			.args(&self.program)
+			.args(&self.args)
 			.stdin(Stdio::piped())
 			.stdout(Stdio::piped())
 			.stderr(Stdio::piped())
@@ -78,9 +78,9 @@ impl Plugin {
 }
 
 #[derive(Debug)]
-pub struct Environment {
-	pub plugin_name: Arc<str>,
-	pub id: Arc<str>,
+pub(crate) struct Environment {
+	pub(crate) plugin_name: Arc<str>,
+	pub(crate) id: Arc<str>,
 	process: Child,
 	call_seq: u32,
 }
@@ -111,7 +111,7 @@ impl Environment {
 		Ok(())
 	}
 
-	pub async fn eval_string(&mut self, code: &str) -> Result<()> {
+	pub(crate) async fn eval_string(&mut self, code: &str) -> Result<()> {
 		let args = EvalStringArgs {
 			code: Cow::Borrowed(code),
 		};
@@ -129,12 +129,12 @@ impl Environment {
 		Ok(())
 	}
 
-	pub async fn kill(&mut self) -> Result<()> {
+	pub(crate) async fn kill(&mut self) -> Result<()> {
 		self.process.kill().await.map_err(Into::into)
 	}
 }
 
-pub struct EnvironmentOutput {
+pub(crate) struct EnvironmentOutput {
 	inner: Cell<Option<ChildStdout>>,
 	hash: u128,
 }
@@ -161,7 +161,7 @@ impl EnvironmentOutput {
 		}
 	}
 
-	pub fn take(&self) -> EnvironmentOutput {
+	pub(crate) fn take(&self) -> EnvironmentOutput {
 		Self {
 			inner: Cell::new(self.inner.take()),
 			hash: self.hash,

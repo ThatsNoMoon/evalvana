@@ -9,7 +9,7 @@ use evalvana_api::EvalResult;
 use crate::plugin::Plugin;
 
 #[derive(Debug, Clone)]
-pub enum Message {
+pub(crate) enum Message {
 	Init(InitMessage),
 	OpenTab(Arc<str>),
 	SwitchTab(usize),
@@ -23,7 +23,7 @@ pub enum Message {
 }
 
 #[derive(Debug, Clone)]
-pub enum InitMessage {
+pub(crate) enum InitMessage {
 	PluginListLoaded(Vec<Plugin>),
 	Error(Arc<Error>),
 }

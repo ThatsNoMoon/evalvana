@@ -3,7 +3,7 @@
 
 use iced::Color;
 
-pub trait ColorExt {
+pub(crate) trait ColorExt {
 	fn from_rgb32(rgb: u32) -> Self;
 }
 
