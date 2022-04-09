@@ -1,9 +1,9 @@
-// Copyright 2021 ThatsNoMoon
+// Copyright 2022 ThatsNoMoon
 // Licensed under the Open Software License version 3.0
 
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, env, sync::Arc};
 
 use anyhow::{anyhow, Context as _, Error};
 use futures::{executor::block_on, FutureExt};
@@ -83,7 +83,7 @@ impl Application for State {
 					},
 
 					Err(e) => {
-						errors.push(Message::Error(e.into()));
+						errors.push(e.into());
 						continue;
 					}
 				};
@@ -94,7 +94,7 @@ impl Application for State {
 					.await
 					.with_context(|| {
 						format!(
-							"Failed to read manifest for plugin {}",
+							"Failed to read manifest for plugin at {}",
 							entry.file_name().to_string_lossy()
 						)
 					})
@@ -102,7 +102,7 @@ impl Application for State {
 						serde_json::from_str(&manifest_text).with_context(
 							|| {
 								format!(
-									"Failed to parse manifest for plugin {}",
+									"Failed to parse manifest for plugin at {}",
 									entry.file_name().to_string_lossy()
 								)
 							},
@@ -111,20 +111,39 @@ impl Application for State {
 					.and_then(|mut plugin: Plugin| {
 						if regex_is_match!(r"[^a-z0-9\-_]"i, &plugin.name) {
 							return Err(anyhow!(
-								"Invalid plugin name: {}",
+								r#"Invalid plugin name "{}""#,
 								plugin.name
 							));
 						}
 
-						if plugin.program.is_relative() {
-							plugin.program = dir.join(&plugin.program);
+						#[cfg(windows)]
+						match plugin.program.extension() {
+							None => {
+								plugin.program.set_extension("exe");
+							}
+							Some(_) => (),
 						}
 
-						plugins.push(plugin);
-						Ok(())
+						plugin.program = which::which_in(
+							&plugin.program,
+							env::var_os("PATH"),
+							&dir,
+						)
+						.with_context(|| {
+							format!(
+								"Failed to determine path \
+									of program {:?} for plugin {}",
+								plugin.program, plugin.name
+							)
+						})?;
+
+						Ok(plugin)
 					}) {
-					Ok(()) => (),
-					Err(e) => errors.push(Message::Error(e.into())),
+					Ok(plugin) => plugins.push(plugin),
+					Err(e) => {
+						errors.push(Message::Error(e.into()));
+						continue;
+					}
 				}
 			}
 
@@ -169,8 +188,10 @@ impl Application for State {
 					.get_mut(&*plugin_name)
 					.expect("Tried to open tab with non-existent plugin");
 
-				let (env, output) =
-					plugin.open().expect("Failed to start plugin environment");
+				let (env, output) = match plugin.open() {
+					Ok(x) => x,
+					Err(e) => return async move { e.into() }.into(),
+				};
 
 				let tab = Tab::new(env);
 

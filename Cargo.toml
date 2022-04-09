@@ -15,6 +15,7 @@ tokio = { version = "1.10", features = ["process", "io-util", "fs", "rt-multi-th
 tokio-stream = { version = "0.1", features = ["io-util", "fs"] }
 futures = { version = "0.3", features = ["executor"] }
 dirs = "4.0"
+which = "4.2"
 evalvana-api = { path = "./plugins/api" }
 serde = "1.0"
 serde_json = "1.0"

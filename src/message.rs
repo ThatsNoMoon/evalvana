@@ -1,4 +1,4 @@
-// Copyright 2021 ThatsNoMoon
+// Copyright 2022 ThatsNoMoon
 // Licensed under the Open Software License version 3.0
 
 use std::sync::Arc;
@@ -32,8 +32,14 @@ impl From<Result<Message, Error>> for Message {
 	fn from(res: Result<Message, Error>) -> Self {
 		match res {
 			Ok(m) => m,
-			Err(e) => Message::Error(e.into()),
+			Err(e) => e.into(),
 		}
+	}
+}
+
+impl From<Error> for Message {
+	fn from(e: Error) -> Self {
+		Message::Error(e.into())
 	}
 }
 
@@ -41,7 +47,7 @@ impl From<Result<(), Error>> for Message {
 	fn from(res: Result<(), Error>) -> Self {
 		match res {
 			Ok(()) => Message::Nothing,
-			Err(e) => Message::Error(e.into()),
+			Err(e) => e.into(),
 		}
 	}
 }
