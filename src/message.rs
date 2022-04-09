@@ -1,9 +1,10 @@
 // Copyright 2021 ThatsNoMoon
 // Licensed under the Open Software License version 3.0
 
+use std::sync::Arc;
+
 use anyhow::Error;
 use evalvana_api::EvalResult;
-use std::sync::Arc;
 
 use crate::plugin::Plugin;
 

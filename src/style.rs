@@ -2,10 +2,10 @@
 // Licensed under the Open Software License version 3.0
 
 pub mod text_input {
-	use crate::config::{Config, EditorColors};
+	pub use iced::text_input::StyleSheet as TextInputStyleSheet;
 	use iced::{text_input::Style, Background, Color};
 
-	pub use iced::text_input::StyleSheet as TextInputStyleSheet;
+	use crate::config::{Config, EditorColors};
 
 	pub struct Editor {
 		colors: EditorColors,
@@ -52,10 +52,10 @@ pub mod text_input {
 }
 
 pub mod button {
-	use crate::config::{Config, UiColors};
+	pub use iced::button::StyleSheet as ButtonStyleSheet;
 	use iced::{button::Style, Background};
 
-	pub use iced::button::StyleSheet as ButtonStyleSheet;
+	use crate::config::{Config, UiColors};
 
 	pub struct Primary {
 		ui_colors: UiColors,
@@ -140,11 +140,12 @@ pub mod button {
 }
 
 pub mod tab {
-	use crate::config::{Config, UiColors};
 	use iced::{
 		button::{Style, StyleSheet as ButtonStyleSheet},
 		Background, Color,
 	};
+
+	use crate::config::{Config, UiColors};
 
 	pub struct Active {
 		ui_colors: UiColors,
@@ -204,11 +205,12 @@ pub mod tab {
 }
 
 pub mod container {
-	use crate::config::Config;
 	use iced::{
 		container::{Style, StyleSheet as ContainerStyleSheet},
 		Background, Color,
 	};
+
+	use crate::config::Config;
 
 	pub struct TabBg {
 		bg: Color,

@@ -1,8 +1,8 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
-use evalvana_api as api;
-
 use std::io::BufRead;
+
+use evalvana_api as api;
 
 fn main() -> std::io::Result<()> {
 	let mut state = 0u8;

@@ -3,6 +3,13 @@
 
 use std::sync::Arc;
 
+use evalvana_api::EvalResult;
+use iced::{
+	button, text_input, Button, Column, Container, Element, Length, Row, Space,
+	Text, TextInput,
+};
+use tokio::sync::RwLock;
+
 use crate::{
 	assets::font,
 	config::Config,
@@ -10,12 +17,6 @@ use crate::{
 	plugin::Environment,
 	style::{self, button::ButtonStyleSheet, text_input::TextInputStyleSheet},
 };
-use evalvana_api::EvalResult;
-use iced::{
-	button, text_input, Button, Column, Container, Element, Length, Row, Space,
-	Text, TextInput,
-};
-use tokio::sync::RwLock;
 
 #[derive(Debug)]
 pub struct Tab {

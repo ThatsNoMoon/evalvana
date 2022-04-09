@@ -1,9 +1,9 @@
 // Copyright 2021 ThatsNoMoon
 // Licensed under the Open Software License version 3.0
 
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-
 use std::{borrow::Cow, fmt, path::Path};
+
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RpcMessage<Id> {
