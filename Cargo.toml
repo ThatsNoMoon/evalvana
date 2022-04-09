@@ -24,4 +24,4 @@ env_logger = "0.9"
 anyhow = "1.0"
 
 [workspace]
-members = ["plugins/cargo"]
+members = ["plugins/cargo", "plugins/api"]
