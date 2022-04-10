@@ -210,10 +210,8 @@ impl Application for State {
 			Message::CloseTab(index) => {
 				let env = self.tabs.remove(index).env;
 				self.running_envs.remove(index);
-				
-				async move {
-					env.write().await.kill().await.into()
-				}.into()
+
+				async move { env.write().await.kill().await.into() }.into()
 			}
 
 			Message::NewContents(tab, contents) => {

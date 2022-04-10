@@ -221,7 +221,10 @@ impl Tabs {
 		self.active_tab = index;
 	}
 
-	pub(crate) fn view<'s>(&'s mut self, config: &Config) -> Element<'s, Message> {
+	pub(crate) fn view<'s>(
+		&'s mut self,
+		config: &Config,
+	) -> Element<'s, Message> {
 		if self.tabs.is_empty() {
 			let handles_placeholder = Space::new(Length::Fill, Length::Fill);
 			let handles_placeholder = Container::new(handles_placeholder)
@@ -301,7 +304,10 @@ impl PluginListing {
 		}
 	}
 
-	pub(crate) fn view<'s>(&'s mut self, config: &Config) -> Element<'s, Message> {
+	pub(crate) fn view<'s>(
+		&'s mut self,
+		config: &Config,
+	) -> Element<'s, Message> {
 		let text = Text::new(&*self.name)
 			.size(config.text_settings.ui_font_size)
 			.color(config.ui_colors.text);

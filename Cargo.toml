@@ -6,7 +6,7 @@ repository = "https://github.com/ThatsNoMoon/evalvana"
 description = "An early WIP REPL environment for any language with a plugin."
 readme = "README.md"
 license = "OSL-3.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 iced = "0.3"
