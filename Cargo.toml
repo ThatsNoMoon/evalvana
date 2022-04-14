@@ -16,7 +16,7 @@ evalvana-api = { path = "./plugins/api" }
 evalvana-editor = { path = "./editor" }
 futures = { version = "0.3", features = ["executor"] }
 getrandom = "0.2"
-iced = { git = "https://github.com/iced-rs/iced", features = ["tokio"] }
+iced = { git = "https://github.com/iced-rs/iced", features = ["tokio", "svg"] }
 iced_futures = { git = "https://github.com/iced-rs/iced", features = ["tokio"] }
 lazy-regex = "2.2"
 png = "0.17"

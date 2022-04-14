@@ -6,13 +6,13 @@ use std::sync::Arc;
 use evalvana_api::EvalResult;
 use evalvana_editor::{self as editor, TextInput};
 use iced::{
-	alignment, button, Button, Column, Container, Element, Length, Row, Space,
-	Text,
+	alignment, button, svg::Handle, Button, Column, Container, Element, Length,
+	Row, Space, Svg, Text,
 };
 use tokio::sync::RwLock;
 
 use crate::{
-	assets::font,
+	assets::{font, EMPTY_TAB_ICON},
 	config::Config,
 	message::Message,
 	plugin::Environment,
@@ -187,10 +187,21 @@ impl Tab {
 	}
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct Tabs {
 	tabs: Vec<Tab>,
 	active_tab: usize,
+	placeholder_icon: Handle,
+}
+
+impl Default for Tabs {
+	fn default() -> Self {
+		Self {
+			tabs: vec![],
+			active_tab: 0,
+			placeholder_icon: Handle::from_memory(EMPTY_TAB_ICON),
+		}
+	}
 }
 
 impl Tabs {
@@ -225,21 +236,16 @@ impl Tabs {
 		config: &Config,
 	) -> Element<'s, Message> {
 		if self.tabs.is_empty() {
-			let handles_placeholder = Space::new(Length::Fill, Length::Fill);
-			let handles_placeholder = Container::new(handles_placeholder)
+			let placeholder_icon = Svg::new(self.placeholder_icon.clone())
+				.width(Length::Units(256))
+				.height(Length::Units(256));
+			return Container::new(placeholder_icon)
+				.center_x()
+				.center_y()
 				.width(Length::Fill)
-				.height(Length::Units(40))
-				.style(style::container::TabBg::from(config));
-
-			let content_placeholder = Space::new(Length::Fill, Length::Fill);
-			let content_placeholder = Container::new(content_placeholder)
-				.style(style::container::TabBg::from(config));
-
-			return Column::with_children(vec![
-				handles_placeholder.into(),
-				content_placeholder.into(),
-			])
-			.into();
+				.height(Length::Fill)
+				.style(style::container::UiBg::from(config))
+				.into();
 		}
 
 		let active_tab = self.active_tab;

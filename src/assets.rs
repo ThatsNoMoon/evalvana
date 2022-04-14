@@ -26,3 +26,8 @@ pub(crate) const ICON64: &[u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
 	"/assets/icons/logo/logo_64.png"
 ));
+
+pub(crate) const EMPTY_TAB_ICON: &[u8] = include_bytes!(concat!(
+	env!("CARGO_MANIFEST_DIR"),
+	"/assets/icons/ui/empty_tab/empty_tab.svg"
+));
