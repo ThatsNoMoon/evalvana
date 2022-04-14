@@ -1,10 +1,10 @@
-// Copyright 2021 ThatsNoMoon
+// Copyright 2022 ThatsNoMoon
 // Licensed under the Open Software License version 3.0
 
 pub(crate) mod font {
 	use iced::Font;
 
-	pub(crate) const MONO_BYTES: &[u8] = include_bytes!(
+	const MONO_BYTES: &[u8] = include_bytes!(
 		"../assets/fonts/JetBrainsMono/JetBrainsMono-Regular.ttf"
 	);
 
@@ -13,7 +13,7 @@ pub(crate) mod font {
 		bytes: MONO_BYTES,
 	};
 
-	pub(crate) const BODY_BYTES: &[u8] =
+	const BODY_BYTES: &[u8] =
 		include_bytes!("../assets/fonts/Roboto/Roboto-Regular.ttf");
 
 	pub(crate) const BODY: Font = Font::External {
@@ -21,3 +21,8 @@ pub(crate) mod font {
 		bytes: BODY_BYTES,
 	};
 }
+
+pub(crate) const ICON64: &[u8] = include_bytes!(concat!(
+	env!("CARGO_MANIFEST_DIR"),
+	"/assets/icons/logo/logo_64.png"
+));

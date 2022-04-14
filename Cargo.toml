@@ -9,21 +9,22 @@ license = "OSL-3.0"
 edition = "2021"
 
 [dependencies]
-iced = { git = "https://github.com/iced-rs/iced", features = ["tokio"] }
-iced_futures = { git = "https://github.com/iced-rs/iced", features = ["tokio"] }
-tokio = { version = "1.10", features = ["process", "io-util", "fs", "rt-multi-thread"] }
-tokio-stream = { version = "0.1", features = ["io-util", "fs"] }
-futures = { version = "0.3", features = ["executor"] }
+anyhow = "1.0"
 dirs = "4.0"
-which = "4.2"
+env_logger = "0.9"
 evalvana-api = { path = "./plugins/api" }
 evalvana-editor = { path = "./editor" }
+futures = { version = "0.3", features = ["executor"] }
+getrandom = "0.2"
+iced = { git = "https://github.com/iced-rs/iced", features = ["tokio"] }
+iced_futures = { git = "https://github.com/iced-rs/iced", features = ["tokio"] }
+lazy-regex = "2.2"
+png = "0.17"
 serde = "1.0"
 serde_json = "1.0"
-getrandom = "0.2"
-lazy-regex = "2.2"
-env_logger = "0.9"
-anyhow = "1.0"
+tokio = { version = "1.10", features = ["process", "io-util", "fs", "rt-multi-thread"] }
+tokio-stream = { version = "0.1", features = ["io-util", "fs"] }
+which = "4.2"
 
 [workspace]
 members = ["editor", "plugins/cargo", "plugins/api"]

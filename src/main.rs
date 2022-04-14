@@ -6,8 +6,10 @@
 use std::{collections::HashMap, env, sync::Arc};
 
 use anyhow::{anyhow, Context as _, Error};
+use assets::ICON64;
 use futures::executor::block_on;
 use iced::{
+	window::{self, Icon},
 	Application, Color, Command, Container, Element, Length, Row, Settings,
 	Space, Subscription,
 };
@@ -325,5 +327,26 @@ impl Application for State {
 fn main() {
 	env_logger::init();
 
-	State::run(Settings::default()).expect("Failed to run app");
+	let icon = {
+		let decoder = png::Decoder::new(ICON64);
+		let mut reader = decoder.read_info().expect("Failed to read icon PNG");
+		let mut buf = vec![0; reader.output_buffer_size()];
+		let info = reader
+			.next_frame(&mut buf)
+			.expect("Failed to read icon PNG");
+		buf.truncate(info.buffer_size());
+
+		Icon::from_rgba(buf, info.width, info.height)
+			.expect("Failed to create icon")
+	};
+
+	let settings = Settings {
+		window: window::Settings {
+			icon: Some(icon),
+			..window::Settings::default()
+		},
+		..Settings::default()
+	};
+
+	State::run(settings).expect("Failed to run app");
 }
