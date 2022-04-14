@@ -1,21 +1,22 @@
 # Evalvana
 
-Evalvana is an extremely WIP (no functionality yet) REPL environment for any language with a plugin.
+Evalvana is an extremely WIP REPL environment for any language with a plugin.
 
 ![Evalvana interface demo](https://github.com/ThatsNoMoon/evalvana/blob/stable/assets/misc/demo_screenshot.png?raw=true)
 
 ## Intended direction
 
-The goal of evalvana is to be able to provide a clean, powerful REPL environment for any language. Being in an extremely early stage of development, how this is going to be realized isn't totally clear yet, but the current theory is that a plugin will be some program that takes evaluation requests in a JSON format through stdin, and outputs the result in JSON through stdout. This approach provides the flexibility of being able to implement the REPL in the language it's evaluating.
+Evalvana's goal is to provide a clean, powerful REPL environment for any language. Being in an extremely early stage of development, how this is going to be realized isn't set in stone yet, but the current plan is that a plugin will be some program that takes evaluation requests in a JSON format through stdin, and outputs the result in JSON through stdout. This approach provides the flexibility of being able to implement the REPL in the language it's evaluating.
 
-The point of evalvana is to improve the REPL experience beyond a barebones text environment in a CLI. Features like autocomplete and intellisense would be nice, but the priority is less on IDE-like features and more on REPL-specific features such as hovering over variables to inspect their value, and being able to easily transition from using a REPL to using a file (something most REPLs are sorely lacking).
-
-## Building
-
-Evalvana requires [Cargo](https://rustup.rs/), [CMake](https://cmake.org/download/), [Ninja](https://ninja-build.org/), and [Python 3](https://www.python.org/downloads/) to build. CMake, Ninja, and Python 3 must be in a folder in your PATH environment variable. After that, `cargo build` should handle building.
+The benefits Evalvana wants to bring to developers include:
+- Keeping the REPL for every language in one application, with a consistent interface
+- Improve the REPL experience beyond what a barebones terminal interface can provide
+- Make it easier to transition from using a REPL to using a file
 
 ## License
 
 Evalvana is licensed under the [OSL 3.0](https://choosealicense.com/licenses/osl-3.0/). Derivatives must be licensed under OSL 3.0, but this does not include any linking restrictions; you may link this code to closed-source code.
 
 Plugins included in this source tree (those under the plugins directory, not including the api) are licensed under the [BSD Zero Clause License](https://choosealicense.com/licenses/0bsd/); in summary, you may use that code with no restriction or warranty. Feel free to copy them to start your own plugin under any other license.
+
+The editor widget (in the editor directory) is derived from the `iced_native` `TextInput` widget and licensed under the [MIT](https://choosealicense.com/licenses/mit/) license.
