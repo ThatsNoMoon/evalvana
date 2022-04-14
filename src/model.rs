@@ -1,12 +1,13 @@
-// Copyright 2021 ThatsNoMoon
+// Copyright 2022 ThatsNoMoon
 // Licensed under the Open Software License version 3.0
 
 use std::sync::Arc;
 
 use evalvana_api::EvalResult;
+use evalvana_editor::{self as editor, TextInput};
 use iced::{
-	button, text_input, Button, Column, Container, Element, Length, Row, Space,
-	Text, TextInput,
+	alignment, button, Button, Column, Container, Element, Length, Row, Space,
+	Text,
 };
 use tokio::sync::RwLock;
 
@@ -24,7 +25,7 @@ pub(crate) struct Tab {
 	plugin_name: Arc<str>,
 	tab_button_state: button::State,
 	close_button_state: button::State,
-	input_state: text_input::State,
+	input_state: editor::State,
 	eval_button_state: button::State,
 	pub(crate) contents: String,
 	pub(crate) results: Vec<EvalResult>,
@@ -38,7 +39,7 @@ impl Tab {
 			plugin_name,
 			tab_button_state: button::State::new(),
 			close_button_state: button::State::new(),
-			input_state: text_input::State::focused(),
+			input_state: editor::State::focused(),
 			eval_button_state: button::State::new(),
 			contents: String::new(),
 			results: vec![],
@@ -114,9 +115,8 @@ impl Tab {
 
 			let input = Container::new(input)
 				.style(style::container::UiBg::from(config))
-				.width(Length::Fill);
-
-			let space = Space::with_height(Length::Fill);
+				.width(Length::Fill)
+				.height(Length::Fill);
 
 			let divider =
 				Container::new(Space::new(Length::Fill, Length::Units(3)))
@@ -171,7 +171,6 @@ impl Tab {
 
 			let contents = Column::new()
 				.push(input)
-				.push(space)
 				.push(divider)
 				.push(results)
 				.push(eval_button);
@@ -264,7 +263,7 @@ impl Tabs {
 			.style(style::container::TabBg::from(config))
 			.height(Length::Units(40))
 			.width(Length::Fill)
-			.align_y(iced::Align::End);
+			.align_y(alignment::Vertical::Bottom);
 
 		Column::new()
 			.push(handles)

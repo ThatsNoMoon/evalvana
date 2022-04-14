@@ -1,0 +1,13 @@
+[package]
+name = "evalvana-editor"
+version = "0.1.0-alpha.1"
+authors = ["ThatsNoMoon <git@thatsnomoon.dev>"]
+repository = "https://github.com/ThatsNoMoon/evalvana"
+description = "Iced text editing widget for Evalvana"
+license = "MIT"
+edition = "2021"
+
+[dependencies]
+iced_native = { git = "https://github.com/iced-rs/iced" }
+iced_graphics = { git = "https://github.com/iced-rs/iced" }
+unicode-segmentation = "1.6"

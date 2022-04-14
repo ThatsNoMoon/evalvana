@@ -6,10 +6,10 @@
 use std::{collections::HashMap, env, sync::Arc};
 
 use anyhow::{anyhow, Context as _, Error};
-use futures::{executor::block_on, FutureExt};
+use futures::executor::block_on;
 use iced::{
-	Application, Clipboard, Color, Command, Container, Element, Length, Row,
-	Settings, Space, Subscription,
+	Application, Color, Command, Container, Element, Length, Row, Settings,
+	Space, Subscription,
 };
 use lazy_regex::{regex_captures, regex_is_match};
 
@@ -41,14 +41,14 @@ pub(crate) struct State {
 impl Application for State {
 	type Message = Message;
 
-	type Executor = iced_futures::executor::Tokio;
+	type Executor = iced::executor::Default;
 
 	type Flags = ();
 
 	fn new(_flags: ()) -> (Self, Command<Message>) {
 		let this = Self::default();
 
-		let cmd = async {
+		let fut = async {
 			let data_dir = dirs::data_dir()
 				.context("Failed to get data dir")?
 				.join("Evalvana");
@@ -158,14 +158,15 @@ impl Application for State {
 			};
 
 			Ok(msg)
-		}
-		.map(|result: Result<Message, Error>| match result {
-			Ok(msg) => msg,
-			Err(e) => Message::Init(InitMessage::Error(e.into())),
-		})
-		.into();
+		};
 
-		(this, cmd)
+		(
+			this,
+			Command::perform(fut, |result: Result<_, Error>| match result {
+				Ok(msg) => msg,
+				Err(e) => Message::Init(InitMessage::Error(e.into())),
+			}),
+		)
 	}
 
 	fn title(&self) -> String {
@@ -176,11 +177,7 @@ impl Application for State {
 		self.config.ui_colors.bg
 	}
 
-	fn update(
-		&mut self,
-		message: Self::Message,
-		clipboard: &mut Clipboard,
-	) -> Command<Message> {
+	fn update(&mut self, message: Self::Message) -> Command<Message> {
 		match message {
 			Message::OpenTab(plugin_name) => {
 				let plugin = self
@@ -190,7 +187,9 @@ impl Application for State {
 
 				let (env, output) = match plugin.open() {
 					Ok(x) => x,
-					Err(e) => return async move { e.into() }.into(),
+					Err(e) => {
+						return Command::perform(async move { e }, Into::into)
+					}
 				};
 
 				let tab = Tab::new(env);
@@ -211,7 +210,10 @@ impl Application for State {
 				let env = self.tabs.remove(index).env;
 				self.running_envs.remove(index);
 
-				async move { env.write().await.kill().await.into() }.into()
+				Command::perform(
+					async move { env.write().await.kill().await },
+					Into::into,
+				)
 			}
 
 			Message::NewContents(tab, contents) => {
@@ -224,8 +226,11 @@ impl Application for State {
 				let code = tab.contents.to_owned();
 				let env = tab.env.clone();
 
-				async move { env.write().await.eval_string(&code).await.into() }
-					.into()
+				Command::perform(
+					async move { env.write().await.eval_string(&code).await },
+					Into::into,
+				)
+				.into()
 			}
 
 			Message::EvalComplete(env, _seq, results) => {
@@ -263,10 +268,9 @@ impl Application for State {
 				Command::none()
 			}
 
-			Message::Batch(msgs) => Command::batch(
-				msgs.into_iter()
-					.map(|msg| self.update(msg, &mut *clipboard)),
-			),
+			Message::Batch(msgs) => {
+				Command::batch(msgs.into_iter().map(|msg| self.update(msg)))
+			}
 
 			Message::Nothing => Command::none(),
 		}
