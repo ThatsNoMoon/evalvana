@@ -230,7 +230,6 @@ impl Application for State {
 					async move { env.write().await.eval_string(&code).await },
 					Into::into,
 				)
-				.into()
 			}
 
 			Message::EvalComplete(env, _seq, results) => {

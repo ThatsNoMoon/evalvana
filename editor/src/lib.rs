@@ -173,7 +173,7 @@ where
 			renderer,
 			layout,
 			cursor_position,
-			&self.state,
+			self.state,
 			value.unwrap_or(&self.value),
 			&self.placeholder,
 			self.size,
@@ -197,7 +197,7 @@ pub fn layout<Renderer>(
 where
 	Renderer: text::Renderer,
 {
-	let text_size = size.unwrap_or(renderer.default_size());
+	let text_size = size.unwrap_or_else(|| renderer.default_size());
 
 	let line_count = value.count("\n") + 1;
 
@@ -214,6 +214,7 @@ where
 
 /// Processes an [`Event`] and updates the [`State`] of a [`TextInput`]
 /// accordingly.
+#[allow(clippy::too_many_arguments)]
 pub fn update<'a, Message, Renderer>(
 	event: Event,
 	layout: Layout<'_>,
@@ -505,7 +506,7 @@ where
 								None => {
 									let content: String = clipboard
 										.read()
-										.unwrap_or(String::new())
+										.unwrap_or_default()
 										.chars()
 										.filter(|&c| {
 											!c.is_control()
@@ -588,6 +589,7 @@ where
 
 /// Draws the [`TextInput`] with the given [`Renderer`], overriding its
 /// [`Value`] if provided.
+#[allow(clippy::too_many_arguments)]
 pub fn draw<Renderer>(
 	renderer: &mut Renderer,
 	layout: Layout<'_>,
@@ -603,7 +605,7 @@ pub fn draw<Renderer>(
 	Renderer: text::Renderer,
 {
 	let secure_value = is_secure.then(|| value.secure());
-	let value = secure_value.as_ref().unwrap_or(&value);
+	let value = secure_value.as_ref().unwrap_or(value);
 
 	let bounds = layout.bounds();
 	let text_bounds = layout.children().next().unwrap().bounds();
@@ -629,15 +631,15 @@ pub fn draw<Renderer>(
 	);
 
 	let text = value.to_string();
-	let size = size.unwrap_or(renderer.default_size());
+	let size = size.unwrap_or_else(|| renderer.default_size());
 
 	let (cursor, offset) = if state.is_focused() {
-		match state.cursor.state(&value) {
+		match state.cursor.state(value) {
 			cursor::State::Index(position) => {
 				let (point, offset) = measure_cursor_and_scroll_offset(
 					renderer,
 					text_bounds,
-					&value,
+					value,
 					size,
 					position,
 					font.clone(),
@@ -669,7 +671,7 @@ pub fn draw<Renderer>(
 					measure_cursor_and_scroll_offset(
 						renderer,
 						text_bounds,
-						&value,
+						value,
 						size,
 						left,
 						font.clone(),
@@ -679,7 +681,7 @@ pub fn draw<Renderer>(
 					measure_cursor_and_scroll_offset(
 						renderer,
 						text_bounds,
-						&value,
+						value,
 						size,
 						right,
 						font.clone(),
@@ -1027,10 +1029,10 @@ fn find_cursor_position<Renderer>(
 where
 	Renderer: text::Renderer,
 {
-	let size = size.unwrap_or(renderer.default_size());
+	let size = size.unwrap_or_else(|| renderer.default_size());
 
 	let offset =
-		offset(renderer, text_bounds, font.clone(), size, &value, &state);
+		offset(renderer, text_bounds, font.clone(), size, value, state);
 
 	point.x += offset;
 
@@ -1038,7 +1040,7 @@ where
 		.hit_test(
 			&value.to_string(),
 			size.into(),
-			font.clone(),
+			font,
 			Size::INFINITY,
 			point,
 			true,
