@@ -623,7 +623,7 @@ pub fn draw<Renderer>(
 	let text = value.to_string();
 	let size = size.unwrap_or_else(|| renderer.default_size());
 
-	let (selection, cursor, offset) = if state.is_focused() {
+	let (selections, cursor, offset) = if state.is_focused() {
 		match state.cursor.state(value) {
 			cursor::State::Index(position) => {
 				let (point, offset) = measure_cursor_and_scroll_offset(
@@ -635,7 +635,7 @@ pub fn draw<Renderer>(
 					font.clone(),
 				);
 
-				(None, Some(point), offset)
+				(vec![], Some(point), offset)
 			}
 			cursor::State::Selection { start, end } => {
 				let left = start.min(end);
@@ -661,22 +661,79 @@ pub fn draw<Renderer>(
 						font.clone(),
 					);
 
-				(
-					Some((
+				let selection_quads = if left_point.y == right_point.y {
+					vec![(
 						renderer::Quad {
 							bounds: Rectangle {
 								x: text_bounds.x + left_point.x,
 								y: text_bounds.y + left_point.y,
 								width: right_point.x - left_point.x,
-								height: right_point.y - left_point.y
-									+ f32::from(size),
+								height: f32::from(size),
 							},
 							border_radius: 0.0,
 							border_width: 0.0,
 							border_color: Color::TRANSPARENT,
 						},
 						style_sheet.selection_color(),
-					)),
+					)]
+				} else {
+					let mut selections = vec![];
+
+					let color = style_sheet.selection_color();
+
+					let quad = |start_point: Point, width| renderer::Quad {
+						bounds: Rectangle {
+							x: text_bounds.x + start_point.x,
+							y: text_bounds.y + start_point.y,
+							width,
+							height: f32::from(size),
+						},
+						border_radius: 0.0,
+						border_width: 0.0,
+						border_color: Color::TRANSPARENT,
+					};
+
+					let mut line_start = left;
+
+					let mut start_point = left_point;
+
+					loop {
+						let line_end =
+							value.next_end_of_line(line_start).min(right);
+
+						let width = if line_end == line_start {
+							if line_end == right || line_start == left {
+								0.0
+							} else {
+								f32::from(size) / 2.0
+							}
+						} else {
+							width_of_range(
+								line_start,
+								line_end,
+								value,
+								renderer,
+								font.clone(),
+								Some(size),
+							)
+						};
+
+						selections.push((quad(start_point, width), color));
+
+						line_start = line_end + 1;
+						start_point =
+							Point::new(0.0, start_point.y + f32::from(size));
+
+						if line_end == right {
+							break;
+						}
+					}
+
+					selections
+				};
+
+				(
+					selection_quads,
 					if end < start {
 						Some(left_point)
 					} else {
@@ -691,7 +748,7 @@ pub fn draw<Renderer>(
 			}
 		}
 	} else {
-		(None, None, 0.0)
+		(vec![], None, 0.0)
 	};
 
 	let cursor = cursor.map(|point| {
@@ -718,7 +775,7 @@ pub fn draw<Renderer>(
 	);
 
 	let render = |renderer: &mut Renderer| {
-		if let Some((selection, color)) = selection {
+		for (selection, color) in selections {
 			renderer.fill_quad(selection, color);
 		}
 
@@ -1043,4 +1100,37 @@ where
 			true,
 		)
 		.map(text::Hit::cursor)
+}
+
+fn offset_x_of_index<Renderer>(
+	index: usize,
+	value: &Value,
+	renderer: &Renderer,
+	font: Renderer::Font,
+	size: Option<u16>,
+) -> f32
+where
+	Renderer: text::Renderer,
+{
+	let line_start = value.previous_start_of_line(index);
+	width_of_range(line_start, index, value, renderer, font, size)
+}
+
+fn width_of_range<Renderer>(
+	start: usize,
+	end: usize,
+	value: &Value,
+	renderer: &Renderer,
+	font: Renderer::Font,
+	size: Option<u16>,
+) -> f32
+where
+	Renderer: text::Renderer,
+{
+	let range = value.select(start, end);
+	renderer.measure_width(
+		&range.to_string(),
+		size.unwrap_or_else(|| renderer.default_size()),
+		font,
+	)
 }

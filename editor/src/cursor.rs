@@ -2,7 +2,7 @@
 use iced_graphics::{Point, Size};
 use iced_native::text;
 
-use crate::Value;
+use crate::{offset_x_of_index, width_of_range, Value};
 
 /// The cursor of a text input.
 #[derive(Debug, Copy, Clone)]
@@ -373,33 +373,6 @@ impl Cursor {
 	}
 }
 
-fn offset_x_of_index<Renderer>(
-	index: usize,
-	value: &Value,
-	renderer: &Renderer,
-	font: Renderer::Font,
-) -> f32
-where
-	Renderer: text::Renderer,
-{
-	let line_start = value.previous_start_of_line(index);
-	width_of_range(line_start, index, value, renderer, font)
-}
-
-fn width_of_range<Renderer>(
-	start: usize,
-	end: usize,
-	value: &Value,
-	renderer: &Renderer,
-	font: Renderer::Font,
-) -> f32
-where
-	Renderer: text::Renderer,
-{
-	let range = value.select(start, end);
-	renderer.measure_width(&range.to_string(), renderer.default_size(), font)
-}
-
 fn find_index_above<Renderer>(
 	index: usize,
 	offset_x_hint: Option<f32>,
@@ -422,9 +395,14 @@ where
 
 	let offset_x = match offset_x_hint {
 		Some(x) => x,
-		None => {
-			width_of_range(line_start, index, value, renderer, font.clone())
-		}
+		None => width_of_range(
+			line_start,
+			index,
+			value,
+			renderer,
+			font.clone(),
+			None,
+		),
 	};
 
 	if previous_line_start == previous_line_end {
@@ -468,7 +446,7 @@ where
 	if next_line_start >= value.len() {
 		return (
 			value.len(),
-			offset_x_of_index(value.len(), value, renderer, font),
+			offset_x_of_index(value.len(), value, renderer, font, None),
 		);
 	}
 
@@ -476,7 +454,7 @@ where
 
 	let offset_x = match offset_x_hint {
 		Some(x) => x,
-		None => offset_x_of_index(index, value, renderer, font.clone()),
+		None => offset_x_of_index(index, value, renderer, font.clone(), None),
 	};
 
 	if next_line_start == next_line_end {
