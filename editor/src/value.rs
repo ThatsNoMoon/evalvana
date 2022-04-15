@@ -170,16 +170,6 @@ impl Value {
 	pub fn remove_many(&mut self, start: usize, end: usize) {
 		let _ = self.graphemes.splice(start..end, std::iter::empty());
 	}
-
-	/// Returns a new [`Value`] with all its graphemes replaced with the
-	/// dot ('•') character.
-	pub fn secure(&self) -> Self {
-		Self {
-			graphemes: std::iter::repeat(String::from("•"))
-				.take(self.graphemes.len())
-				.collect(),
-		}
-	}
 }
 
 impl ToString for Value {

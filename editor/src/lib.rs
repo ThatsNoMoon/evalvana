@@ -54,7 +54,6 @@ pub struct TextInput<'a, Message, Renderer: text::Renderer> {
 	state: &'a mut State,
 	placeholder: String,
 	value: Value,
-	is_secure: bool,
 	font: Renderer::Font,
 	width: Length,
 	height: Length,
@@ -90,7 +89,6 @@ where
 			state,
 			placeholder: String::from(placeholder),
 			value: Value::new(value),
-			is_secure: false,
 			font: Default::default(),
 			width: Length::Fill,
 			height: Length::Fill,
@@ -100,12 +98,6 @@ where
 			on_submit: None,
 			style_sheet: Default::default(),
 		}
-	}
-
-	/// Converts the [`TextInput`] into a secure password input.
-	pub fn password(mut self) -> Self {
-		self.is_secure = true;
-		self
 	}
 
 	/// Sets the [`Font`] of the [`Text`].
@@ -178,7 +170,6 @@ where
 			&self.placeholder,
 			self.size,
 			&self.font,
-			self.is_secure,
 			self.style_sheet.as_ref(),
 		)
 	}
@@ -225,7 +216,6 @@ pub fn update<'a, Message, Renderer>(
 	value: &mut Value,
 	size: Option<u16>,
 	font: &Renderer::Font,
-	is_secure: bool,
 	on_change: &dyn Fn(String) -> Message,
 	on_submit: &Option<Message>,
 	state: impl FnOnce() -> &'a mut State,
@@ -252,18 +242,12 @@ where
 				match click.kind() {
 					click::Kind::Single => {
 						let position = if offset != Vector::new(0.0, 0.0) {
-							let value = if is_secure {
-								value.secure()
-							} else {
-								value.clone()
-							};
-
 							find_cursor_position(
 								renderer,
 								text_layout.bounds(),
 								font.clone(),
 								size,
-								&value,
+								value,
 								state,
 								Point::ORIGIN + offset,
 							)
@@ -275,25 +259,21 @@ where
 						state.is_dragging = true;
 					}
 					click::Kind::Double => {
-						if is_secure {
-							state.cursor.select_all(value);
-						} else {
-							let position = find_cursor_position(
-								renderer,
-								text_layout.bounds(),
-								font.clone(),
-								size,
-								value,
-								state,
-								Point::ORIGIN + offset,
-							)
-							.unwrap_or(0);
+						let position = find_cursor_position(
+							renderer,
+							text_layout.bounds(),
+							font.clone(),
+							size,
+							value,
+							state,
+							Point::ORIGIN + offset,
+						)
+						.unwrap_or(0);
 
-							state.cursor.select_range(
-								value.previous_start_of_word(position),
-								value.next_end_of_word(position),
-							);
-						}
+						state.cursor.select_range(
+							value.previous_start_of_word(position),
+							value.next_end_of_word(position),
+						);
 
 						state.is_dragging = false;
 					}
@@ -321,18 +301,12 @@ where
 				let text_layout = layout.children().next().unwrap();
 				let offset = position - text_layout.bounds().position();
 
-				let value = if is_secure {
-					value.secure()
-				} else {
-					value.clone()
-				};
-
 				let position = find_cursor_position(
 					renderer,
 					text_layout.bounds(),
 					font.clone(),
 					size,
-					&value,
+					value,
 					state,
 					Point::ORIGIN + offset,
 				)
@@ -340,7 +314,7 @@ where
 
 				state
 					.cursor
-					.select_range(state.cursor.start(&value), position);
+					.select_range(state.cursor.start(value), position);
 
 				return event::Status::Captured;
 			}
@@ -386,12 +360,7 @@ where
 						if platform::is_jump_modifier_pressed(modifiers)
 							&& state.cursor.selection(value).is_none()
 						{
-							if is_secure {
-								let cursor_pos = state.cursor.end(value);
-								state.cursor.select_range(0, cursor_pos);
-							} else {
-								state.cursor.select_left_by_words(value);
-							}
+							state.cursor.select_left_by_words(value);
 						}
 
 						let mut editor = Editor::new(value, &mut state.cursor);
@@ -404,14 +373,7 @@ where
 						if platform::is_jump_modifier_pressed(modifiers)
 							&& state.cursor.selection(value).is_none()
 						{
-							if is_secure {
-								let cursor_pos = state.cursor.end(value);
-								state
-									.cursor
-									.select_range(cursor_pos, value.len());
-							} else {
-								state.cursor.select_right_by_words(value);
-							}
+							state.cursor.select_right_by_words(value);
 						}
 
 						let mut editor = Editor::new(value, &mut state.cursor);
@@ -421,9 +383,7 @@ where
 						shell.publish(message);
 					}
 					keyboard::KeyCode::Left => {
-						if platform::is_jump_modifier_pressed(modifiers)
-							&& !is_secure
-						{
+						if platform::is_jump_modifier_pressed(modifiers) {
 							if modifiers.shift() {
 								state.cursor.select_left_by_words(value);
 							} else {
@@ -436,9 +396,7 @@ where
 						}
 					}
 					keyboard::KeyCode::Right => {
-						if platform::is_jump_modifier_pressed(modifiers)
-							&& !is_secure
-						{
+						if platform::is_jump_modifier_pressed(modifiers) {
 							if modifiers.shift() {
 								state.cursor.select_right_by_words(value);
 							} else {
@@ -477,9 +435,7 @@ where
 						}
 					}
 					keyboard::KeyCode::Home => {
-						if platform::is_jump_modifier_pressed(modifiers)
-							&& !is_secure
-						{
+						if platform::is_jump_modifier_pressed(modifiers) {
 							if modifiers.shift() {
 								state
 									.cursor
@@ -494,9 +450,7 @@ where
 						}
 					}
 					keyboard::KeyCode::End => {
-						if platform::is_jump_modifier_pressed(modifiers)
-							&& !is_secure
-						{
+						if platform::is_jump_modifier_pressed(modifiers) {
 							if modifiers.shift() {
 								state.cursor.select_range(
 									state.cursor.start(value),
@@ -639,14 +593,10 @@ pub fn draw<Renderer>(
 	placeholder: &str,
 	size: Option<u16>,
 	font: &Renderer::Font,
-	is_secure: bool,
 	style_sheet: &dyn StyleSheet,
 ) where
 	Renderer: text::Renderer,
 {
-	let secure_value = is_secure.then(|| value.secure());
-	let value = secure_value.as_ref().unwrap_or(value);
-
 	let bounds = layout.bounds();
 	let text_bounds = layout.children().next().unwrap().bounds();
 
@@ -876,7 +826,6 @@ where
 			&mut self.value,
 			self.size,
 			&self.font,
-			self.is_secure,
 			self.on_change.as_ref(),
 			&self.on_submit,
 			|| &mut self.state,
