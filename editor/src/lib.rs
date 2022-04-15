@@ -450,23 +450,65 @@ where
 							state.cursor.move_right(value);
 						}
 					}
-					keyboard::KeyCode::Home => {
+					keyboard::KeyCode::Up => {
 						if modifiers.shift() {
-							state
-								.cursor
-								.select_range(state.cursor.start(value), 0);
+							state.cursor.select_up(
+								value,
+								renderer,
+								font.clone(),
+							)
 						} else {
-							state.cursor.move_to(0);
+							state.cursor.move_up(value, renderer, font.clone());
+						}
+					}
+					keyboard::KeyCode::Down => {
+						if modifiers.shift() {
+							state.cursor.select_down(
+								value,
+								renderer,
+								font.clone(),
+							)
+						} else {
+							state.cursor.move_down(
+								value,
+								renderer,
+								font.clone(),
+							);
+						}
+					}
+					keyboard::KeyCode::Home => {
+						if platform::is_jump_modifier_pressed(modifiers)
+							&& !is_secure
+						{
+							if modifiers.shift() {
+								state
+									.cursor
+									.select_range(state.cursor.start(value), 0);
+							} else {
+								state.cursor.move_to(0);
+							}
+						} else if modifiers.shift() {
+							state.cursor.select_left_by_line(value);
+						} else {
+							state.cursor.move_left_by_line(value);
 						}
 					}
 					keyboard::KeyCode::End => {
-						if modifiers.shift() {
-							state.cursor.select_range(
-								state.cursor.start(value),
-								value.len(),
-							);
+						if platform::is_jump_modifier_pressed(modifiers)
+							&& !is_secure
+						{
+							if modifiers.shift() {
+								state.cursor.select_range(
+									state.cursor.start(value),
+									value.len(),
+								);
+							} else {
+								state.cursor.move_to(value.len());
+							}
+						} else if modifiers.shift() {
+							state.cursor.select_right_by_line(value);
 						} else {
-							state.cursor.move_to(value.len());
+							state.cursor.move_right_by_line(value);
 						}
 					}
 					keyboard::KeyCode::C
@@ -544,9 +586,7 @@ where
 						state.keyboard_modifiers =
 							keyboard::Modifiers::default();
 					}
-					keyboard::KeyCode::Tab
-					| keyboard::KeyCode::Up
-					| keyboard::KeyCode::Down => {
+					keyboard::KeyCode::Tab => {
 						return event::Status::Ignored;
 					}
 					_ => {}

@@ -79,6 +79,28 @@ impl Value {
 			.unwrap_or(self.len())
 	}
 
+	/// Returns the position of the previous start of a line from the given
+	/// grapheme `index`.
+	pub fn previous_start_of_line(&self, index: usize) -> usize {
+		self.graphemes[..index.min(self.len())]
+			.iter()
+			.rposition(|g| g == "\n")
+			.map_or(0, |x| (x + 1).min(self.len()))
+	}
+
+	/// Returns the position of the next end of a line from the given grapheme
+	/// `index`.
+	pub fn next_end_of_line(&self, index: usize) -> usize {
+		if index == self.len() {
+			return self.len();
+		}
+
+		self.graphemes[index..]
+			.iter()
+			.position(|g| g == "\n")
+			.map_or(self.len(), |x| x + index)
+	}
+
 	/// Returns a new [`Value`] containing the graphemes from `start` until the
 	/// given `end`.
 	pub fn select(&self, start: usize, end: usize) -> Self {
