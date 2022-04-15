@@ -199,7 +199,7 @@ where
 {
 	let text_size = size.unwrap_or_else(|| renderer.default_size());
 
-	let line_count = value.count("\n") + 1;
+	let line_count = value.count_lines() + 1;
 
 	let text_height = text_size as usize * line_count;
 
@@ -355,10 +355,10 @@ where
 			{
 				let mut editor = Editor::new(value, &mut state.cursor);
 
+				editor.insert(c);
+
 				if c == '\r' {
 					editor.insert('\n');
-				} else {
-					editor.insert(c);
 				}
 
 				let message = (on_change)(editor.contents());
@@ -1046,13 +1046,11 @@ fn measure_cursor_and_scroll_offset<Renderer>(
 where
 	Renderer: text::Renderer,
 {
-	let text_before_cursor = value.until(cursor_index);
+	let lines_before_cursor = value.count_lines_before(cursor_index);
 
-	let lines_before_cursor = text_before_cursor.count("\n");
-
-	let line_before_cursor = text_before_cursor
-		.after_grapheme("\n")
-		.map_or_else(|| text_before_cursor.to_string(), |v| v.to_string());
+	let line_before_cursor = value
+		.select(value.previous_start_of_line(cursor_index), cursor_index)
+		.to_string();
 
 	let text_value_width =
 		renderer.measure_width(&line_before_cursor, size, font);

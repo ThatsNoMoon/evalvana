@@ -32,10 +32,18 @@ impl Value {
 	}
 
 	/// Returns the number of times the given grapheme appears in the [`Value`].
-	pub fn count(&self, grapheme: &str) -> usize {
+	pub fn count_lines(&self) -> usize {
 		self.graphemes
 			.iter()
-			.filter(|s| s.as_str() == grapheme)
+			.filter(|&g| g == "\n" || g == "\r\n")
+			.count()
+	}
+
+	/// Returns the number of times the given grapheme appears in the [`Value`].
+	pub fn count_lines_before(&self, index: usize) -> usize {
+		self.graphemes[..index.min(self.len())]
+			.iter()
+			.filter(|&g| g == "\n" || g == "\r\n")
 			.count()
 	}
 
@@ -84,7 +92,7 @@ impl Value {
 	pub fn previous_start_of_line(&self, index: usize) -> usize {
 		self.graphemes[..index.min(self.len())]
 			.iter()
-			.rposition(|g| g == "\n")
+			.rposition(|g| g == "\n" || g == "\r\n")
 			.map_or(0, |x| (x + 1).min(self.len()))
 	}
 
@@ -97,7 +105,7 @@ impl Value {
 
 		self.graphemes[index..]
 			.iter()
-			.position(|g| g == "\n")
+			.position(|g| g == "\n" || g == "\r\n")
 			.map_or(self.len(), |x| x + index)
 	}
 
