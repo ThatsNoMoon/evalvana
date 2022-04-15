@@ -4,6 +4,7 @@
 
 pub mod cursor;
 mod editor;
+pub mod style;
 mod value;
 
 use std::borrow::Cow;
@@ -17,11 +18,10 @@ use iced_native::{
 	mouse::{self, click},
 	renderer,
 	text::{self, Text},
-	touch,
-	widget::text_input::StyleSheet,
-	Clipboard, Element, Layout, Length, Padding, Point, Rectangle, Shell, Size,
-	Widget,
+	touch, Clipboard, Element, Layout, Length, Padding, Point, Rectangle,
+	Shell, Size, Widget,
 };
+use style::StyleSheet;
 pub use value::Value;
 
 /// A field that can be filled with text.
@@ -673,7 +673,7 @@ pub fn draw<Renderer>(
 	let text = value.to_string();
 	let size = size.unwrap_or_else(|| renderer.default_size());
 
-	let (cursor, offset) = if state.is_focused() {
+	let (selection, cursor, offset) = if state.is_focused() {
 		match state.cursor.state(value) {
 			cursor::State::Index(position) => {
 				let (point, offset) = measure_cursor_and_scroll_offset(
@@ -685,29 +685,13 @@ pub fn draw<Renderer>(
 					font.clone(),
 				);
 
-				(
-					Some((
-						renderer::Quad {
-							bounds: Rectangle {
-								x: text_bounds.x + point.x,
-								y: text_bounds.y + point.y,
-								width: 1.0,
-								height: size.into(),
-							},
-							border_radius: 0.0,
-							border_width: 0.0,
-							border_color: Color::TRANSPARENT,
-						},
-						style_sheet.value_color(),
-					)),
-					offset,
-				)
+				(None, Some(point), offset)
 			}
 			cursor::State::Selection { start, end } => {
 				let left = start.min(end);
 				let right = end.max(start);
 
-				let (start_point, left_offset) =
+				let (left_point, left_offset) =
 					measure_cursor_and_scroll_offset(
 						renderer,
 						text_bounds,
@@ -717,7 +701,7 @@ pub fn draw<Renderer>(
 						font.clone(),
 					);
 
-				let (end_point, right_offset) =
+				let (right_point, right_offset) =
 					measure_cursor_and_scroll_offset(
 						renderer,
 						text_bounds,
@@ -731,10 +715,10 @@ pub fn draw<Renderer>(
 					Some((
 						renderer::Quad {
 							bounds: Rectangle {
-								x: text_bounds.x + start_point.x,
-								y: text_bounds.y + start_point.y,
-								width: end_point.x - start_point.x,
-								height: end_point.y - start_point.y
+								x: text_bounds.x + left_point.x,
+								y: text_bounds.y + left_point.y,
+								width: right_point.x - left_point.x,
+								height: right_point.y - left_point.y
 									+ f32::from(size),
 							},
 							border_radius: 0.0,
@@ -743,6 +727,11 @@ pub fn draw<Renderer>(
 						},
 						style_sheet.selection_color(),
 					)),
+					if end < start {
+						Some(left_point)
+					} else {
+						Some(right_point)
+					},
 					if end == right {
 						right_offset
 					} else {
@@ -752,8 +741,25 @@ pub fn draw<Renderer>(
 			}
 		}
 	} else {
-		(None, 0.0)
+		(None, None, 0.0)
 	};
+
+	let cursor = cursor.map(|point| {
+		(
+			renderer::Quad {
+				bounds: Rectangle {
+					x: text_bounds.x + point.x - 1.0,
+					y: text_bounds.y + point.y - 1.0,
+					width: 2.0,
+					height: f32::from(size) + 2.0,
+				},
+				border_radius: 0.0,
+				border_width: 0.0,
+				border_color: Color::TRANSPARENT,
+			},
+			style_sheet.cursor_color(),
+		)
+	});
 
 	let text_width = renderer.measure_width(
 		if text.is_empty() { placeholder } else { &text },
@@ -762,6 +768,10 @@ pub fn draw<Renderer>(
 	);
 
 	let render = |renderer: &mut Renderer| {
+		if let Some((selection, color)) = selection {
+			renderer.fill_quad(selection, color);
+		}
+
 		if let Some((cursor, color)) = cursor {
 			renderer.fill_quad(cursor, color);
 		}

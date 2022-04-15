@@ -1,9 +1,10 @@
-// Copyright 2021 ThatsNoMoon
+// Copyright 2022 ThatsNoMoon
 // Licensed under the Open Software License version 3.0
 
 pub(crate) mod text_input {
-	pub(crate) use iced::text_input::StyleSheet as TextInputStyleSheet;
-	use iced::{text_input::Style, Background, Color};
+	use evalvana_editor::style::Style;
+	pub(crate) use evalvana_editor::style::StyleSheet as TextInputStyleSheet;
+	use iced::{Background, Color};
 
 	use crate::config::{Config, EditorColors};
 
@@ -43,6 +44,10 @@ pub(crate) mod text_input {
 
 		fn selection_color(&self) -> iced::Color {
 			self.colors.selection
+		}
+
+		fn cursor_color(&self) -> Color {
+			self.colors.cursor
 		}
 
 		fn hovered(&self) -> Style {

@@ -1,4 +1,4 @@
-// Copyright 2021 ThatsNoMoon
+// Copyright 2022 ThatsNoMoon
 // Licensed under the Open Software License version 3.0
 
 use iced::Color;
@@ -48,6 +48,7 @@ pub(crate) struct EditorColors {
 	pub(crate) bg: Color,
 	pub(crate) main: Color,
 	pub(crate) selection: Color,
+	pub(crate) cursor: Color,
 	pub(crate) gutter: Color,
 	pub(crate) strings: Color,
 	pub(crate) numbers: Color,
@@ -70,6 +71,7 @@ impl Default for EditorColors {
 			bg: Color::from_rgb32(0x282C34),
 			main: Color::from_rgb32(0xABB2BF),
 			selection: Color::from_rgba8(0x61, 0xAF, 0xEF, 0.3),
+			cursor: Color::from_rgb32(0x61AFEF),
 			gutter: Color::from_rgb32(0x838891),
 			strings: Color::from_rgb32(0x98C379),
 			numbers: Color::from_rgb32(0xD19A66),
