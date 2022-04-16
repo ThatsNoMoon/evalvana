@@ -22,12 +22,24 @@ pub(crate) mod font {
 	};
 }
 
+pub(crate) mod icons {
+	use iced::Font;
+
+	const FONT_BYTES: &[u8] = include_bytes!("../assets/fonts/icons.ttf");
+
+	pub(crate) const FONT: Font = Font::External {
+		name: "Evalvana Icons",
+		bytes: FONT_BYTES,
+	};
+
+	pub(crate) const NEW_CELL: char = '\u{e900}';
+
+	pub(crate) const CLOSE_TAB: char = '\u{e901}';
+
+	pub(crate) const EMPTY_TAB: char = '\u{e902}';
+}
+
 pub(crate) const ICON64: &[u8] = include_bytes!(concat!(
 	env!("CARGO_MANIFEST_DIR"),
 	"/assets/icons/logo/logo_64.png"
-));
-
-pub(crate) const EMPTY_TAB_ICON: &[u8] = include_bytes!(concat!(
-	env!("CARGO_MANIFEST_DIR"),
-	"/assets/icons/ui/empty_tab/empty_tab.svg"
 ));

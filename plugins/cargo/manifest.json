@@ -1,5 +1,8 @@
 {
 	"name": "Cargo",
 	"program": "./evalvana-plugin-cargo",
-	"args": []
+	"args": [],
+	"capabilities": {
+		"multiple_cells": false
+	}
 }

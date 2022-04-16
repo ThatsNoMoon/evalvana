@@ -5,13 +5,6 @@
    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
    xmlns:svg="http://www.w3.org/2000/svg"
    xmlns="http://www.w3.org/2000/svg"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   inkscape:version="1.0 (4035a4fb49, 2020-05-01)"
-   inkscape:export-ydpi="224"
-   inkscape:export-xdpi="224"
-   inkscape:export-filename="D:\Development\evalvana\assets\icons\ui\close\close_dark_56.png "
-   sodipodi:docname="close.svg"
    id="svg827"
    viewBox="0 0 1000 1000"
    height="1000"
@@ -31,35 +24,11 @@
   </metadata>
   <defs
      id="defs831" />
-  <sodipodi:namedview
-     inkscape:document-rotation="0"
-     inkscape:current-layer="layer2"
-     inkscape:window-maximized="1"
-     inkscape:window-y="-8"
-     inkscape:window-x="-8"
-     inkscape:cy="447.95776"
-     inkscape:cx="193.61368"
-     inkscape:zoom="0.55611002"
-     showgrid="false"
-     id="namedview829"
-     inkscape:window-height="1377"
-     inkscape:window-width="2560"
-     inkscape:pageshadow="2"
-     inkscape:pageopacity="0"
-     guidetolerance="10"
-     gridtolerance="10"
-     objecttolerance="10"
-     borderopacity="1"
-     bordercolor="#666666"
-     pagecolor="#282c34" />
   <g
      transform="translate(3.484375,3.484375)"
      style="display:none"
-     inkscape:label="light"
-     id="layer1"
-     inkscape:groupmode="layer">
+     id="layer1">
     <path
-       inkscape:connector-curvature="0"
        style="fill:#000000;fill-opacity:0.328283"
        id="path825"
        d="M 19,6.41 17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12 Z" />
@@ -67,9 +36,7 @@
   <g
      transform="translate(3.484375,3.484375)"
      style="display:inline"
-     inkscape:label="dark"
-     id="layer2"
-     inkscape:groupmode="layer">
+     id="layer2">
     <path
        d="M 143.07252,8.6048577 C 94.220225,57.457158 45.367925,106.30946 -3.484375,155.16176 110.30024,268.94637 224.08486,382.73099 337.86947,496.5156 224.08486,610.30022 110.30024,724.08484 -3.484375,837.86945 49.397669,890.75148 102.27971,943.63355 155.16176,996.51562 268.94637,882.73097 382.73099,768.94635 496.5156,655.16174 610.30022,768.94635 724.08484,882.73097 837.86945,996.51562 890.75148,943.63355 943.63355,890.75148 996.51562,837.86945 882.73097,724.08484 768.94635,610.30022 655.16174,496.5156 768.94635,382.73099 882.73097,268.94637 996.51562,155.16176 943.63355,102.27971 890.75148,49.397669 837.86945,-3.484375 724.08484,110.30024 610.30022,224.08486 496.5156,337.86947 382.73099,224.08486 268.94637,110.30024 155.16176,-3.484375 151.13201,0.54536952 147.10227,4.5751132 143.07252,8.6048577 Z"
        style="fill:#c1c8d6;fill-opacity:1;stroke-width:61.0664"

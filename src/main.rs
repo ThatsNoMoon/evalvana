@@ -96,16 +96,16 @@ impl Application for State {
 					.await
 					.with_context(|| {
 						format!(
-							"Failed to read manifest for plugin at {}",
-							entry.file_name().to_string_lossy()
+							"Failed to read manifest for plugin at {:?}",
+							manifest
 						)
 					})
 					.and_then(|manifest_text| {
 						serde_json::from_str(&manifest_text).with_context(
 							|| {
 								format!(
-									"Failed to parse manifest for plugin at {}",
-									entry.file_name().to_string_lossy()
+									"Failed to parse manifest for plugin at {:?}",
+									manifest
 								)
 							},
 						)
@@ -194,7 +194,7 @@ impl Application for State {
 					}
 				};
 
-				let tab = Tab::new(env);
+				let tab = Tab::new(env, plugin.capabilities.clone());
 
 				self.running_envs.push(output);
 
@@ -218,27 +218,56 @@ impl Application for State {
 				)
 			}
 
-			Message::NewContents(tab, contents) => {
-				self.tabs[tab].contents = contents;
+			Message::NewContents(tab, cell, contents) => {
+				self.tabs[tab].cells[cell].contents = contents;
 				Command::none()
 			}
 
-			Message::Eval(tab) => {
-				let tab = &mut self.tabs[tab];
-				let code = tab.contents.to_owned();
+			Message::Eval(tab_index, cell) => {
+				let tab = &mut self.tabs[tab_index];
+				let code = tab.cells[cell].contents.to_owned();
 				let env = tab.env.clone();
 
 				Command::perform(
 					async move { env.write().await.eval_string(&code).await },
-					Into::into,
+					move |res| match res {
+						Ok(seq) => {
+							Message::RequestInFlight(tab_index, cell, seq)
+						}
+						Err(e) => Message::Error(e.into()),
+					},
 				)
 			}
 
-			Message::EvalComplete(env, _seq, results) => {
-				match self.tabs.iter_mut().find(|tab| *block_on(tab.env.read()).id == *env) {
-					Some(t) => t.results = results,
-					None => eprintln!("Received eval results for an environment with no tab: {}", env),
+			Message::RequestInFlight(tab, cell, seq) => {
+				if let Some(t) = self.tabs.tabs.get_mut(tab) {
+					t.request_in_flight(cell, seq);
 				}
+
+				Command::none()
+			}
+
+			Message::EvalComplete(env, seq, results) => {
+				match self
+					.tabs
+					.iter_mut()
+					.find(|tab| *block_on(tab.env.read()).id == *env)
+				{
+					Some(t) => {
+						t.eval_complete(seq, results);
+					}
+					None => eprintln!(
+						"Received eval results for an \
+						environment with no tab: {}",
+						env
+					),
+				}
+				Command::none()
+			}
+
+			Message::NewCell(tab) => {
+				self.tabs[tab].cells.new_cell();
+
 				Command::none()
 			}
 

@@ -22,6 +22,8 @@ pub(crate) struct UiColors {
 	pub(crate) secondary_unfocused_bg: Color,
 	pub(crate) text: Color,
 	pub(crate) unfocused_text: Color,
+	pub(crate) unfocused_icon: Color,
+	pub(crate) bg_icon: Color,
 	pub(crate) accent: Color,
 	pub(crate) borders: Color,
 }
@@ -37,6 +39,8 @@ impl Default for UiColors {
 			secondary_unfocused_bg: Color::from_rgb32(0x313640),
 			text: Color::from_rgb32(0xC1C8D6),
 			unfocused_text: Color::from_rgb32(0x8C919C),
+			unfocused_icon: Color::from_rgb32(0x676B73),
+			bg_icon: Color::from_rgb32(0x43474f),
 			accent: Color::from_rgb32(0x61AFEF),
 			borders: Color::from_rgb32(0x4B5263),
 		}

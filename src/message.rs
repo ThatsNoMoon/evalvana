@@ -14,11 +14,13 @@ pub(crate) enum Message {
 	OpenTab(Arc<str>),
 	SwitchTab(usize),
 	CloseTab(usize),
-	NewContents(usize, String),
+	NewContents(usize, usize, String),
 	Error(Arc<Error>),
 	Batch(Vec<Message>),
-	Eval(usize),
+	Eval(usize, usize),
+	RequestInFlight(usize, usize, u32),
 	EvalComplete(String, u32, Vec<EvalResult>),
+	NewCell(usize),
 	Nothing,
 }
 

@@ -1,22 +1,27 @@
 // Copyright 2022 ThatsNoMoon
 // Licensed under the Open Software License version 3.0
 
-use std::sync::Arc;
+pub(crate) mod cell;
+
+use std::{collections::HashMap, sync::Arc};
 
 use evalvana_api::EvalResult;
-use evalvana_editor::{self as editor, TextInput};
 use iced::{
-	alignment, button, svg::Handle, Button, Column, Container, Element, Length,
-	Row, Space, Svg, Text,
+	alignment, button, scrollable, Button, Column, Container, Element, Length,
+	Row, Space, Text,
 };
 use tokio::sync::RwLock;
 
+use self::cell::{Cell, Cells};
 use crate::{
-	assets::{font, EMPTY_TAB_ICON},
+	assets::{
+		font,
+		icons::{self, CLOSE_TAB, EMPTY_TAB},
+	},
 	config::Config,
 	message::Message,
-	plugin::Environment,
-	style::{self, button::ButtonStyleSheet, text_input::TextInputStyleSheet},
+	plugin::{Capabilities, Environment},
+	style,
 };
 
 #[derive(Debug)]
@@ -25,24 +30,33 @@ pub(crate) struct Tab {
 	plugin_name: Arc<str>,
 	tab_button_state: button::State,
 	close_button_state: button::State,
-	input_state: editor::State,
-	eval_button_state: button::State,
-	pub(crate) contents: String,
-	pub(crate) results: Vec<EvalResult>,
+	pub(crate) cells: Cells,
 }
 
 impl Tab {
-	pub(crate) fn new(env: Environment) -> Self {
+	pub(crate) fn new(
+		env: Environment,
+		plugin_capabilities: Capabilities,
+	) -> Self {
 		let plugin_name = env.plugin_name.clone();
+
+		let cells = if plugin_capabilities.multiple_cells {
+			Cells::Multiple {
+				cells: vec![Cell::default()],
+				scrollable_state: scrollable::State::new(),
+				new_cell_button_state: button::State::new(),
+				in_flight_requests: HashMap::new(),
+			}
+		} else {
+			Cells::Single(Cell::default())
+		};
+
 		Self {
 			env: Arc::new(RwLock::new(env)),
 			plugin_name,
 			tab_button_state: button::State::new(),
 			close_button_state: button::State::new(),
-			input_state: editor::State::focused(),
-			eval_button_state: button::State::new(),
-			contents: String::new(),
-			results: vec![],
+			cells,
 		}
 	}
 
@@ -72,28 +86,16 @@ impl Tab {
 			Button::new(&mut self.tab_button_state, row)
 				.height(Length::Fill)
 				.on_press(Message::SwitchTab(index))
-				.style(if is_active {
-					Box::new(style::tab::Active::from(config))
-						as Box<dyn ButtonStyleSheet + 'static>
-				} else {
-					style::tab::Inactive::from(config).into()
-				})
+				.style(style::button::TabHandle::new(config, is_active))
 		};
 
 		let close_button = {
-			let icon = Text::new("x")
-				.color(config.ui_colors.text)
-				.size(config.text_settings.ui_font_size);
+			let icon = Text::new(CLOSE_TAB).font(icons::FONT).size(8);
 			let icon = Container::new(icon).center_y().height(Length::Fill);
 
 			Button::new(&mut self.close_button_state, icon)
 				.height(Length::Fill)
-				.style(if is_active {
-					Box::new(style::button::Secondary::from(config))
-						as Box<dyn ButtonStyleSheet + 'static>
-				} else {
-					style::tab::Inactive::from(config).into()
-				})
+				.style(style::button::TabClose::new(config, is_active))
 				.on_press(Message::CloseTab(index))
 		};
 
@@ -101,107 +103,50 @@ impl Tab {
 			Row::with_children(vec![tab_button.into(), close_button.into()])
 				.into();
 
-		if is_active {
-			let input = TextInput::new(
-				&mut self.input_state,
-				"",
-				&self.contents,
-				move |contents| Message::NewContents(index, contents),
-			)
-			.size(config.text_settings.editor_font_size)
-			.style(Box::new(style::text_input::Editor::from(config))
-				as Box<dyn TextInputStyleSheet + 'static>)
-			.font(font::MONO);
-
-			let input = Container::new(input)
-				.style(style::container::UiBg::from(config))
-				.width(Length::Fill)
-				.height(Length::Fill);
-
-			let divider =
-				Container::new(Space::new(Length::Fill, Length::Units(3)))
-					.style(style::container::SecondaryBg::from(config));
-
-			let results = self
-				.results
-				.iter()
-				.map(|result| {
-					let (color, msg) = match result {
-						EvalResult::Success(msg) => {
-							(config.editor_colors.success, &*msg.text)
-						}
-						EvalResult::Warning(msg) => {
-							(config.editor_colors.warnings, &*msg.text)
-						}
-						EvalResult::Error(msg) => {
-							(config.editor_colors.errors, &*msg.text)
-						}
-					};
-
-					let text = Text::new(msg)
-						.size(config.text_settings.editor_font_size)
-						.color(color)
-						.font(font::MONO);
-
-					Column::new()
-						.push(text)
-						.push(Space::with_height(Length::Units(10)))
-						.into()
-				})
-				.collect();
-
-			let results = Column::with_children(results);
-
-			let eval_button = {
-				let text = Text::new("Eval")
-					.color(config.ui_colors.text)
-					.size(config.text_settings.ui_font_size);
-
-				let text = Container::new(text).padding(10);
-
-				let contents = Row::new()
-					.push(Space::with_width(Length::Units(10)))
-					.push(text)
-					.push(Space::with_width(Length::Units(10)));
-
-				Button::new(&mut self.eval_button_state, contents)
-					.style(style::button::Primary::from(config))
-					.on_press(Message::Eval(index))
-			};
-
-			let contents = Column::new()
-				.push(input)
-				.push(divider)
-				.push(results)
-				.push(eval_button);
-
-			let contents = Container::new(contents)
-				.padding(20)
-				.width(Length::Fill)
-				.height(Length::Fill);
-
-			(handle, Some(contents.into()))
+		let contents = if is_active {
+			Some(self.cells.view(config, index))
 		} else {
-			(handle, None)
+			None
+		};
+
+		(handle, contents)
+	}
+
+	pub(crate) fn request_in_flight(&mut self, cell: usize, seq: u32) {
+		if let Cells::Multiple {
+			cells,
+			in_flight_requests,
+			..
+		} = &mut self.cells
+		{
+			if cell < cells.len() {
+				in_flight_requests.insert(seq, cell);
+			}
+		}
+	}
+
+	pub(crate) fn eval_complete(&mut self, seq: u32, results: Vec<EvalResult>) {
+		match &mut self.cells {
+			Cells::Single(cell) => cell.results = results,
+			Cells::Multiple {
+				cells,
+				in_flight_requests,
+				..
+			} => {
+				if let Some(cell) =
+					in_flight_requests.get(&seq).and_then(|&i| cells.get_mut(i))
+				{
+					cell.results = results;
+				}
+			}
 		}
 	}
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(crate) struct Tabs {
-	tabs: Vec<Tab>,
+	pub(crate) tabs: Vec<Tab>,
 	active_tab: usize,
-	placeholder_icon: Handle,
-}
-
-impl Default for Tabs {
-	fn default() -> Self {
-		Self {
-			tabs: vec![],
-			active_tab: 0,
-			placeholder_icon: Handle::from_memory(EMPTY_TAB_ICON),
-		}
-	}
 }
 
 impl Tabs {
@@ -236,9 +181,10 @@ impl Tabs {
 		config: &Config,
 	) -> Element<'s, Message> {
 		if self.tabs.is_empty() {
-			let placeholder_icon = Svg::new(self.placeholder_icon.clone())
-				.width(Length::Units(256))
-				.height(Length::Units(256));
+			let placeholder_icon = Text::new(EMPTY_TAB)
+				.font(icons::FONT)
+				.size(256)
+				.color(config.ui_colors.bg_icon);
 			return Container::new(placeholder_icon)
 				.center_x()
 				.center_y()

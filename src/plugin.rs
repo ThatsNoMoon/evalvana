@@ -24,6 +24,7 @@ pub(crate) struct Plugin {
 	pub(crate) name: Arc<str>,
 	pub(crate) program: PathBuf,
 	pub(crate) args: Vec<String>,
+	pub(crate) capabilities: Capabilities,
 	#[serde(skip)]
 	env_seq: u32,
 }
@@ -77,6 +78,12 @@ impl Plugin {
 	}
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct Capabilities {
+	#[serde(default)]
+	pub(crate) multiple_cells: bool,
+}
+
 #[derive(Debug)]
 pub(crate) struct Environment {
 	pub(crate) plugin_name: Arc<str>,
@@ -111,12 +118,14 @@ impl Environment {
 		Ok(())
 	}
 
-	pub(crate) async fn eval_string(&mut self, code: &str) -> Result<()> {
+	pub(crate) async fn eval_string(&mut self, code: &str) -> Result<u32> {
 		let args = EvalStringArgs {
 			code: Cow::Borrowed(code),
 		};
 
-		let id = format!("{}/{}", self.id, self.call_seq);
+		let seq = self.call_seq;
+
+		let id = format!("{}/{}", self.id, seq);
 
 		let call = EvalStringCall {
 			rpc: RpcMessage::new(Cow::Borrowed(&id)),
@@ -126,7 +135,9 @@ impl Environment {
 
 		self.send_method_call(&call).await?;
 
-		Ok(())
+		self.call_seq += 1;
+
+		Ok(seq)
 	}
 
 	pub(crate) async fn kill(&mut self) -> Result<()> {
