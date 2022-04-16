@@ -117,13 +117,6 @@ pub(crate) mod button {
 		}
 	}
 
-	pub(crate) fn secondary(config: &Config) -> StyleSheet {
-		StyleSheet {
-			bg: config.ui_colors.bg,
-			..primary(config)
-		}
-	}
-
 	pub(crate) fn new_cell(config: &Config) -> StyleSheet {
 		StyleSheet {
 			bg: config.editor_colors.bg,

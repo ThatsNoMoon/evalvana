@@ -6,7 +6,6 @@
 use std::{collections::HashMap, env, sync::Arc};
 
 use anyhow::{anyhow, Context as _, Error};
-use assets::ICON64;
 use futures::executor::block_on;
 use iced::{
 	window::{self, Icon},
@@ -24,17 +23,18 @@ pub(crate) mod plugin;
 pub(crate) mod style;
 
 use crate::{
+	assets::ICON64,
 	config::Config,
 	message::{InitMessage, Message},
-	model::{PluginListing, Tab, Tabs},
+	model::{PluginListing, Plugins, Tab, Tabs},
 	plugin::{EnvironmentOutput, Plugin},
 };
 
 #[derive(Debug, Default)]
 pub(crate) struct State {
 	pub(crate) tabs: Tabs,
-	pub(crate) plugin_listings: Vec<PluginListing>,
-	pub(crate) plugins: HashMap<Arc<str>, Plugin>,
+	pub(crate) plugins: Plugins,
+	pub(crate) plugin_map: HashMap<Arc<str>, Plugin>,
 	pub(crate) config: Config,
 	running_envs: Vec<EnvironmentOutput>,
 	loaded: bool,
@@ -183,7 +183,7 @@ impl Application for State {
 		match message {
 			Message::OpenTab(plugin_name) => {
 				let plugin = self
-					.plugins
+					.plugin_map
 					.get_mut(&*plugin_name)
 					.expect("Tried to open tab with non-existent plugin");
 
@@ -273,13 +273,14 @@ impl Application for State {
 
 			Message::Init(m) => match m {
 				InitMessage::PluginListLoaded(plugins) => {
-					self.plugin_listings = plugins
+					self.plugins.list = plugins
 						.iter()
 						.map(|plugin| PluginListing::new(plugin.name.clone()))
 						.collect();
-					self.plugin_listings
+					self.plugins
+						.list
 						.sort_unstable_by(|a, b| a.name.cmp(&b.name));
-					self.plugins = plugins
+					self.plugin_map = plugins
 						.into_iter()
 						.map(|plugin| (plugin.name.clone(), plugin))
 						.collect();
@@ -338,13 +339,12 @@ impl Application for State {
 			return Space::new(Length::Fill, Length::Fill).into();
 		}
 
-		let sidebar =
-			PluginListing::view_list(&mut self.plugin_listings, &self.config);
+		let sidebar = self.plugins.view(&self.config);
 		let sidebar = Container::new(sidebar)
 			.style(style::container::secondary_bg(&self.config))
 			.width(Length::Units(230))
 			.height(Length::Fill)
-			.padding(15)
+			.padding([15, 0])
 			.into();
 
 		let content = self.tabs.view(&self.config);

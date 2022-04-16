@@ -8,7 +8,7 @@ use std::{collections::HashMap, sync::Arc};
 use evalvana_api::EvalResult;
 use iced::{
 	alignment, button, scrollable, Button, Column, Container, Element, Length,
-	Row, Space, Text,
+	Row, Scrollable, Space, Text,
 };
 use tokio::sync::RwLock;
 
@@ -246,7 +246,40 @@ impl std::ops::IndexMut<usize> for Tabs {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default)]
+pub(crate) struct Plugins {
+	pub(crate) list: Vec<PluginListing>,
+	scrollable_state: scrollable::State,
+}
+
+impl Plugins {
+	pub(crate) fn view<'s>(
+		&'s mut self,
+		config: &Config,
+	) -> Element<'s, Message> {
+		let header = {
+			let text = Text::new("Available REPLs")
+				.size(config.text_settings.header_font_size)
+				.color(config.ui_colors.accent)
+				.font(font::BODY);
+
+			Container::new(text)
+				.center_x()
+				.padding(5)
+				.width(Length::Fill)
+		};
+
+		let list = Scrollable::new(&mut self.scrollable_state)
+			.push(header)
+			.push(Space::with_height(Length::Units(15)));
+		self.list
+			.iter_mut()
+			.fold(list, |list, info| list.push(info.view(config)))
+			.into()
+	}
+}
+
+#[derive(Debug)]
 pub(crate) struct PluginListing {
 	pub(crate) name: Arc<str>,
 	button_state: button::State,
@@ -270,41 +303,15 @@ impl PluginListing {
 
 		let inner = Container::new(text)
 			.center_y()
+			.padding(10)
 			.height(Length::Fill)
 			.width(Length::Fill);
 
 		Button::new(&mut self.button_state, inner)
 			.on_press(Message::OpenTab(self.name.clone()))
-			.style(style::button::secondary(config))
-			.padding(10)
+			.style(style::button::primary(config))
 			.height(Length::Units(70))
 			.width(Length::Fill)
-			.into()
-	}
-
-	pub(crate) fn view_list<'s>(
-		info: &'s mut [Self],
-		config: &Config,
-	) -> Element<'s, Message> {
-		let header = {
-			let text = Text::new("Available REPLs")
-				.size(config.text_settings.header_font_size)
-				.color(config.ui_colors.accent)
-				.font(font::BODY);
-
-			Container::new(text)
-				.center_x()
-				.padding(5)
-				.width(Length::Fill)
-		};
-
-		let column = Column::new().push(header);
-		info.iter_mut()
-			.fold(column, |column, info| {
-				column
-					.push(Space::with_height(Length::Units(15)))
-					.push(info.view(config))
-			})
 			.into()
 	}
 }
