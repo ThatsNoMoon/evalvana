@@ -211,7 +211,7 @@ impl Tabs {
 		if self.tabs.is_empty() {
 			let placeholder_icon = Text::new(EMPTY_TAB)
 				.font(icons::FONT)
-				.size(256)
+				.size(250)
 				.color(config.ui_colors.bg_icon);
 			return Container::new(placeholder_icon)
 				.center_x()

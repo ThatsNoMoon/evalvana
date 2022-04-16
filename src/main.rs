@@ -372,6 +372,7 @@ fn main() {
 	let settings = Settings {
 		window: window::Settings {
 			icon: Some(icon),
+			min_size: Some((630, 400)),
 			..window::Settings::default()
 		},
 		..Settings::default()
