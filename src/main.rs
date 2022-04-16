@@ -341,7 +341,7 @@ impl Application for State {
 		let sidebar =
 			PluginListing::view_list(&mut self.plugin_listings, &self.config);
 		let sidebar = Container::new(sidebar)
-			.style(style::container::SecondaryBg::from(&self.config))
+			.style(style::container::secondary_bg(&self.config))
 			.width(Length::Units(230))
 			.height(Length::Fill)
 			.padding(15)

@@ -61,12 +61,12 @@ impl Cell {
 		.font(font::MONO);
 
 		let input = Container::new(input)
-			.style(style::container::UiBg::from(config))
+			.style(style::container::ui_bg(config))
 			.width(Length::Fill)
 			.height(Length::Fill);
 
 		let divider =
-			Rule::horizontal(21).style(style::rule::CellDivider::from(config));
+			Rule::horizontal(21).style(style::rule::cell_divider(config, 1));
 
 		let results = self
 			.results
@@ -107,7 +107,7 @@ impl Cell {
 				.push(Space::with_width(Length::Units(10)));
 
 			Button::new(&mut self.eval_button_state, contents)
-				.style(style::button::Primary::from(config))
+				.style(style::button::primary(config))
 				.on_press(Message::Eval(tab_index, index))
 		};
 
@@ -167,7 +167,7 @@ impl Cells {
 							.height(Length::Units(300));
 
 						let divider = Rule::horizontal(3)
-							.style(style::rule::CellDivider::new(config, 2));
+							.style(style::rule::cell_divider(config, 2));
 
 						Column::new().push(contents).push(divider).into()
 					})
@@ -185,7 +185,7 @@ impl Cells {
 					.width(Length::Fill)
 					.height(Length::Fill);
 					Button::new(new_cell_button_state, contents)
-						.style(style::button::NewCell::from(config))
+						.style(style::button::new_cell(config))
 						.on_press(Message::NewCell(tab_index))
 						.width(Length::Fill)
 						.height(Length::Units(200))
@@ -194,7 +194,7 @@ impl Cells {
 				let scrollable = scrollable.push(new_cell);
 
 				let contents = Container::new(scrollable)
-					.style(style::container::UiBg::from(config))
+					.style(style::container::editor_bg(config))
 					.height(Length::Fill);
 
 				contents.into()

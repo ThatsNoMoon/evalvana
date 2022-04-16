@@ -83,10 +83,15 @@ impl Tab {
 				Space::with_width(Length::Units(50)).into(),
 			]);
 
-			Button::new(&mut self.tab_button_state, row)
+			let button = Button::new(&mut self.tab_button_state, row)
 				.height(Length::Fill)
-				.on_press(Message::SwitchTab(index))
-				.style(style::button::TabHandle::new(config, is_active))
+				.style(style::button::tab_handle(config));
+
+			if is_active {
+				button
+			} else {
+				button.on_press(Message::SwitchTab(index))
+			}
 		};
 
 		let close_button = {
@@ -95,7 +100,7 @@ impl Tab {
 
 			Button::new(&mut self.close_button_state, icon)
 				.height(Length::Fill)
-				.style(style::button::TabClose::new(config, is_active))
+				.style(style::button::tab_close(config, is_active))
 				.on_press(Message::CloseTab(index))
 		};
 
@@ -190,7 +195,7 @@ impl Tabs {
 				.center_y()
 				.width(Length::Fill)
 				.height(Length::Fill)
-				.style(style::container::UiBg::from(config))
+				.style(style::container::ui_bg(config))
 				.into();
 		}
 
@@ -212,7 +217,7 @@ impl Tabs {
 		);
 
 		let handles = Container::new(handles)
-			.style(style::container::TabBg::from(config))
+			.style(style::container::tab_bg(config))
 			.height(Length::Units(40))
 			.width(Length::Fill)
 			.align_y(alignment::Vertical::Bottom);
@@ -270,7 +275,7 @@ impl PluginListing {
 
 		Button::new(&mut self.button_state, inner)
 			.on_press(Message::OpenTab(self.name.clone()))
-			.style(style::button::Secondary::from(config))
+			.style(style::button::secondary(config))
 			.padding(10)
 			.height(Length::Units(70))
 			.width(Length::Fill)
