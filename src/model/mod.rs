@@ -3,7 +3,7 @@
 
 pub(crate) mod cell;
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt, sync::Arc};
 
 use evalvana_api::EvalResult;
 use iced::{
@@ -23,6 +23,24 @@ use crate::{
 	plugin::{Capabilities, Environment},
 	style,
 };
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct TabIndex(pub(crate) usize);
+
+impl fmt::Display for TabIndex {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		fmt::Display::fmt(&self.0, f)
+	}
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct CellIndex(pub(crate) usize);
+
+impl fmt::Display for CellIndex {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		fmt::Display::fmt(&self.0, f)
+	}
+}
 
 #[derive(Debug)]
 pub(crate) struct Tab {
@@ -64,7 +82,7 @@ impl Tab {
 		&'s mut self,
 		config: &Config,
 		is_active: bool,
-		index: usize,
+		index: TabIndex,
 	) -> (Element<'s, Message>, Option<Element<'s, Message>>) {
 		let tab_button = {
 			let label = Text::new(&*self.plugin_name)
@@ -117,14 +135,14 @@ impl Tab {
 		(handle, contents)
 	}
 
-	pub(crate) fn request_in_flight(&mut self, cell: usize, seq: u32) {
+	pub(crate) fn request_in_flight(&mut self, cell: CellIndex, seq: u32) {
 		if let Cells::Multiple {
 			cells,
 			in_flight_requests,
 			..
 		} = &mut self.cells
 		{
-			if cell < cells.len() {
+			if cell < CellIndex(cells.len()) {
 				in_flight_requests.insert(seq, cell);
 			}
 		}
@@ -138,8 +156,9 @@ impl Tab {
 				in_flight_requests,
 				..
 			} => {
-				if let Some(cell) =
-					in_flight_requests.get(&seq).and_then(|&i| cells.get_mut(i))
+				if let Some(cell) = in_flight_requests
+					.get(&seq)
+					.and_then(|&CellIndex(i)| cells.get_mut(i))
 				{
 					cell.results = results;
 				}
@@ -151,18 +170,18 @@ impl Tab {
 #[derive(Debug, Default)]
 pub(crate) struct Tabs {
 	pub(crate) tabs: Vec<Tab>,
-	active_tab: usize,
+	active_tab: TabIndex,
 }
 
 impl Tabs {
 	pub(crate) fn push(&mut self, tab: Tab) {
 		self.tabs.push(tab);
-		self.active_tab = self.tabs.len() - 1;
+		self.active_tab = TabIndex(self.tabs.len() - 1);
 	}
 
-	pub(crate) fn remove(&mut self, index: usize) -> Tab {
-		let tab = self.tabs.remove(index);
-		self.active_tab = self.active_tab.saturating_sub(1);
+	pub(crate) fn remove(&mut self, index: TabIndex) -> Tab {
+		let tab = self.tabs.remove(index.0);
+		self.active_tab.0 = self.active_tab.0.saturating_sub(1);
 		tab
 	}
 
@@ -170,8 +189,12 @@ impl Tabs {
 		self.tabs.iter_mut()
 	}
 
-	pub(crate) fn set_active(&mut self, index: usize) {
-		if index >= self.tabs.len() {
+	pub(crate) fn get_mut(&mut self, index: TabIndex) -> Option<&mut Tab> {
+		self.tabs.get_mut(index.0)
+	}
+
+	pub(crate) fn set_active(&mut self, index: TabIndex) {
+		if index >= TabIndex(self.tabs.len()) {
 			panic!(
 				"Index {} out of bounds for tab list of length {}",
 				index,
@@ -206,6 +229,7 @@ impl Tabs {
 				.height(iced::Length::Units(33))
 				.push(Space::with_width(Length::Units(7))),
 			|row, (i, tab)| {
+				let i = TabIndex(i);
 				let (handle, contents) = tab.view(config, i == active_tab, i);
 
 				if i == active_tab {
@@ -232,17 +256,17 @@ impl Tabs {
 	}
 }
 
-impl std::ops::Index<usize> for Tabs {
+impl std::ops::Index<TabIndex> for Tabs {
 	type Output = Tab;
 
-	fn index(&self, index: usize) -> &Self::Output {
-		&self.tabs[index]
+	fn index(&self, index: TabIndex) -> &Self::Output {
+		&self.tabs[index.0]
 	}
 }
 
-impl std::ops::IndexMut<usize> for Tabs {
-	fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-		&mut self.tabs[index]
+impl std::ops::IndexMut<TabIndex> for Tabs {
+	fn index_mut(&mut self, index: TabIndex) -> &mut Self::Output {
+		&mut self.tabs[index.0]
 	}
 }
 

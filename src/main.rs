@@ -210,7 +210,7 @@ impl Application for State {
 
 			Message::CloseTab(index) => {
 				let env = self.tabs.remove(index).env;
-				self.running_envs.remove(index);
+				self.running_envs.remove(index.0);
 
 				Command::perform(
 					async move { env.write().await.kill().await },
@@ -240,7 +240,7 @@ impl Application for State {
 			}
 
 			Message::RequestInFlight(tab, cell, seq) => {
-				if let Some(t) = self.tabs.tabs.get_mut(tab) {
+				if let Some(t) = self.tabs.get_mut(tab) {
 					t.request_in_flight(cell, seq);
 				}
 

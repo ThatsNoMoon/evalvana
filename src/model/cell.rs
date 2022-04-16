@@ -13,6 +13,7 @@ use iced::{
 	Scrollable, Space, Text,
 };
 
+use super::{CellIndex, TabIndex};
 use crate::{
 	assets::{
 		font,
@@ -46,8 +47,8 @@ impl Cell {
 	pub(super) fn view<'s>(
 		&'s mut self,
 		config: &Config,
-		tab_index: usize,
-		index: usize,
+		tab_index: TabIndex,
+		index: CellIndex,
 	) -> Element<'s, Message> {
 		let input = TextInput::new(
 			&mut self.input_state,
@@ -128,7 +129,7 @@ pub(crate) enum Cells {
 		cells: Vec<Cell>,
 		scrollable_state: scrollable::State,
 		new_cell_button_state: button::State,
-		in_flight_requests: HashMap<u32, usize>,
+		in_flight_requests: HashMap<u32, CellIndex>,
 	},
 }
 
@@ -136,11 +137,11 @@ impl Cells {
 	pub(super) fn view<'s>(
 		&'s mut self,
 		config: &Config,
-		tab_index: usize,
+		tab_index: TabIndex,
 	) -> Element<'s, Message> {
 		match self {
 			Cells::Single(cell) => {
-				let cell_contents = cell.view(config, tab_index, 0);
+				let cell_contents = cell.view(config, tab_index, CellIndex(0));
 
 				let contents = Container::new(cell_contents)
 					.padding(20)
@@ -160,7 +161,8 @@ impl Cells {
 					.iter_mut()
 					.enumerate()
 					.map(|(cell_index, cell)| {
-						let contents = cell.view(config, tab_index, cell_index);
+						let contents =
+							cell.view(config, tab_index, CellIndex(cell_index));
 						let contents = Container::new(contents)
 							.padding(20)
 							.width(Length::Fill)
@@ -215,13 +217,13 @@ impl Cells {
 	}
 }
 
-impl Index<usize> for Cells {
+impl Index<CellIndex> for Cells {
 	type Output = Cell;
 
-	fn index(&self, index: usize) -> &Self::Output {
+	fn index(&self, index: CellIndex) -> &Self::Output {
 		match self {
 			Self::Single(cell) => {
-				if index == 0 {
+				if index.0 == 0 {
 					cell
 				} else {
 					panic!(
@@ -230,16 +232,16 @@ impl Index<usize> for Cells {
 					)
 				}
 			}
-			Cells::Multiple { cells, .. } => &cells[index],
+			Cells::Multiple { cells, .. } => &cells[index.0],
 		}
 	}
 }
 
-impl IndexMut<usize> for Cells {
-	fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+impl IndexMut<CellIndex> for Cells {
+	fn index_mut(&mut self, index: CellIndex) -> &mut Self::Output {
 		match self {
 			Self::Single(cell) => {
-				if index == 0 {
+				if index.0 == 0 {
 					cell
 				} else {
 					panic!(
@@ -248,7 +250,7 @@ impl IndexMut<usize> for Cells {
 					)
 				}
 			}
-			Cells::Multiple { cells, .. } => &mut cells[index],
+			Cells::Multiple { cells, .. } => &mut cells[index.0],
 		}
 	}
 }

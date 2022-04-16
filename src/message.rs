@@ -6,21 +6,24 @@ use std::sync::Arc;
 use anyhow::Error;
 use evalvana_api::EvalResult;
 
-use crate::plugin::Plugin;
+use crate::{
+	model::{CellIndex, TabIndex},
+	plugin::Plugin,
+};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Message {
 	Init(InitMessage),
 	OpenTab(Arc<str>),
-	SwitchTab(usize),
-	CloseTab(usize),
-	NewContents(usize, usize, String),
+	SwitchTab(TabIndex),
+	CloseTab(TabIndex),
+	NewContents(TabIndex, CellIndex, String),
 	Error(Arc<Error>),
 	Batch(Vec<Message>),
-	Eval(usize, usize),
-	RequestInFlight(usize, usize, u32),
+	Eval(TabIndex, CellIndex),
+	RequestInFlight(TabIndex, CellIndex, u32),
 	EvalComplete(String, u32, Vec<EvalResult>),
-	NewCell(usize),
+	NewCell(TabIndex),
 	Nothing,
 }
 
