@@ -751,22 +751,31 @@ pub fn draw<Renderer>(
 		(vec![], None, 0.0)
 	};
 
-	let cursor = cursor.map(|point| {
-		(
-			renderer::Quad {
-				bounds: Rectangle {
-					x: text_bounds.x + point.x - 1.0,
-					y: text_bounds.y + point.y - 1.0,
-					width: 2.0,
-					height: f32::from(size) + 2.0,
+	let cursor = cursor
+		.filter(|&point| {
+			bounds.contains(point + (text_bounds.position() - Point::ORIGIN))
+		})
+		.map(|point| {
+			let y = text_bounds.y + point.y - 1.0;
+
+			let height =
+				f32::min(f32::from(size) + 2.0, bounds.y + bounds.height - y);
+
+			(
+				renderer::Quad {
+					bounds: Rectangle {
+						x: text_bounds.x + point.x - 1.0,
+						y,
+						width: 2.0,
+						height,
+					},
+					border_radius: 0.0,
+					border_width: 0.0,
+					border_color: Color::TRANSPARENT,
 				},
-				border_radius: 0.0,
-				border_width: 0.0,
-				border_color: Color::TRANSPARENT,
-			},
-			style_sheet.cursor_color(),
-		)
-	});
+				style_sheet.cursor_color(),
+			)
+		});
 
 	let text_width = renderer.measure_width(
 		if text.is_empty() { placeholder } else { &text },
