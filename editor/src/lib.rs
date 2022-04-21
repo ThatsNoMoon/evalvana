@@ -1171,6 +1171,10 @@ where
 		.select(line_start, value.next_end_of_line(line_start))
 		.to_string();
 
+	if line.is_empty() {
+		return Some(line_start);
+	}
+
 	renderer
 		.hit_test(&line, size.into(), font, Size::INFINITY, point, true)
 		.map(text::Hit::cursor)
