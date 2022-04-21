@@ -43,7 +43,7 @@ pub(crate) struct State {
 impl Application for State {
 	type Message = Message;
 
-	type Executor = iced::executor::Default;
+	type Executor = iced_futures::backend::native::tokio::Executor;
 
 	type Flags = ();
 
