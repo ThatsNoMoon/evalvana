@@ -33,24 +33,37 @@ impl Value {
 		self.graphemes.len()
 	}
 
-	pub fn lines(&self) -> impl Iterator<Item = String> + '_ {
+	pub fn lines(
+		&self,
+		tab_width: impl Into<Option<u8>>,
+	) -> impl Iterator<Item = String> + '_ {
 		let mut start = 0;
-		std::iter::from_fn(move || match start.cmp(&self.graphemes.len()) {
-			Ordering::Greater => None,
-			Ordering::Equal => {
-				start += 1;
-				Some(String::new())
-			}
-			Ordering::Less => {
-				let end = self.next_end_of_line(start);
-				let slice = &self.graphemes[start..=end.min(self.len() - 1)];
-				start = end + 1;
-				Some(slice.concat())
+		let tab_width = tab_width.into();
+
+		std::iter::from_fn(move || -> Option<String> {
+			match start.cmp(&self.graphemes.len()) {
+				Ordering::Greater => None,
+				Ordering::Equal => {
+					start += 1;
+					Some(String::new())
+				}
+				Ordering::Less => {
+					let end = self.next_end_of_line(start);
+					let slice =
+						&self.graphemes[start..=end.min(self.len() - 1)];
+					start = end + 1;
+					match tab_width {
+						Some(n) => Some(
+							slice.iter().map(|g| replace_tab(g, n)).collect(),
+						),
+						None => Some(slice.concat()),
+					}
+				}
 			}
 		})
 	}
 
-	/// Returns the number of times the given grapheme appears in the [`Value`].
+	/// Returns the number of line endings in the [`Value`].
 	pub fn count_lines(&self) -> usize {
 		self.graphemes
 			.iter()
@@ -58,7 +71,7 @@ impl Value {
 			.count()
 	}
 
-	/// Returns the number of times the given grapheme appears in the [`Value`].
+	/// Returns the number of line endings before the given index in the [`Value`].
 	pub fn count_lines_before(&self, index: usize) -> usize {
 		self.graphemes[..index.min(self.len())]
 			.iter()
@@ -66,7 +79,7 @@ impl Value {
 			.count()
 	}
 
-	/// Returns the number of times the given grapheme appears in the [`Value`].
+	/// Returns the number of line endings between the two indices in the [`Value`].
 	pub fn count_lines_between(&self, start: usize, end: usize) -> usize {
 		self.graphemes[start..end.min(self.len())]
 			.iter()
@@ -87,6 +100,14 @@ impl Value {
 				.map(|(i, _)| i + 1)
 				.filter(|&i| i < self.graphemes.len())
 		}
+	}
+
+	/// Returns the number of tabs between the two indices in the [`Value`].
+	pub fn count_tabs_between(&self, start: usize, end: usize) -> usize {
+		self.graphemes[start..end.min(self.len())]
+			.iter()
+			.filter(|&g| g == "\t")
+			.count()
 	}
 
 	/// Returns the position of the previous start of a word from the given
@@ -191,7 +212,7 @@ impl Value {
 		self.graphemes.insert(index, c.to_string());
 
 		self.graphemes =
-			UnicodeSegmentation::graphemes(&self.to_string() as &str, true)
+			UnicodeSegmentation::graphemes(self.to_string(None).as_str(), true)
 				.map(String::from)
 				.collect();
 	}
@@ -212,11 +233,28 @@ impl Value {
 	pub fn remove_many(&mut self, start: usize, end: usize) {
 		let _ = self.graphemes.splice(start..end, std::iter::empty());
 	}
+
+	/// Gets the content of this [`Value`] with the specified tab width.
+	///
+	/// Passing `None` will disable conversion of tabs into spaces. Otherwise,
+	/// tabs will be converted into the given number of spaces.
+	pub fn to_string(&self, tab_width: impl Into<Option<u8>>) -> String {
+		match tab_width.into() {
+			Some(n) => {
+				self.graphemes.iter().map(|g| replace_tab(g, n)).collect()
+			}
+			None => self.graphemes.concat(),
+		}
+	}
 }
 
-impl ToString for Value {
-	/// Converts the [`Value`] into a `String`.
-	fn to_string(&self) -> String {
-		self.graphemes.concat()
+fn replace_tab(grapheme: &str, tab_width: u8) -> &str {
+	// 255 spaces
+	const SPACES: &str = "                                                                                                                                                                                                                                                               ";
+
+	if grapheme == "\t" {
+		&SPACES[..tab_width as usize]
+	} else {
+		&*grapheme
 	}
 }

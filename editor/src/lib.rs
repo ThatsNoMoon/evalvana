@@ -60,6 +60,7 @@ pub struct TextInput<'a, Message, Renderer: text::Renderer> {
 	height: Length,
 	padding: Padding,
 	size: Option<u16>,
+	tab_width: u8,
 	on_change: Box<dyn Fn(String) -> Message + 'a>,
 	on_submit: Option<Message>,
 	style_sheet: Box<dyn StyleSheet + 'a>,
@@ -95,6 +96,7 @@ where
 			height: Length::Fill,
 			padding: Padding::ZERO,
 			size: None,
+			tab_width: 4,
 			on_change: Box::new(on_change),
 			on_submit: None,
 			style_sheet: Default::default(),
@@ -129,6 +131,12 @@ where
 	/// Sets the text size of the [`TextInput`].
 	pub fn size(mut self, size: u16) -> Self {
 		self.size = Some(size);
+		self
+	}
+
+	/// Set the tab width of the [`TextInput`].
+	pub fn tab_width(mut self, tab_width: u8) -> Self {
+		self.tab_width = tab_width;
 		self
 	}
 
@@ -170,6 +178,7 @@ where
 			value.unwrap_or(&self.value),
 			&self.placeholder,
 			self.size,
+			self.tab_width,
 			&self.font,
 			self.style_sheet.as_ref(),
 		)
@@ -216,6 +225,7 @@ pub fn update<'a, Message, Renderer>(
 	shell: &mut Shell<'_, Message>,
 	value: &mut Value,
 	size: Option<u16>,
+	tab_width: u8,
 	font: &Renderer::Font,
 	on_change: &dyn Fn(String) -> Message,
 	on_submit: &Option<Message>,
@@ -250,6 +260,7 @@ where
 								renderer,
 								font.clone(),
 								size,
+								tab_width,
 								value,
 								state,
 								Point::ORIGIN + offset,
@@ -266,6 +277,7 @@ where
 							renderer,
 							font.clone(),
 							size,
+							tab_width,
 							value,
 							state,
 							Point::ORIGIN + offset,
@@ -304,6 +316,7 @@ where
 					renderer,
 					font.clone(),
 					size,
+					tab_width,
 					value,
 					state,
 					Point::ORIGIN + offset,
@@ -333,10 +346,14 @@ where
 			}
 
 			if delta.x.abs() > 0.1 {
-				let max =
-					(max_line_length(value, renderer, font.clone(), size)
-						- text_bounds.width)
-						.max(0.0);
+				let max = (max_line_length(
+					value,
+					renderer,
+					font.clone(),
+					size,
+					tab_width,
+				) - text_bounds.width)
+					.max(0.0);
 				state.scroll.x = (state.scroll.x + delta.x).max(0.0).min(max);
 			}
 		}
@@ -344,7 +361,7 @@ where
 			if state.is_focused
 				&& state.is_pasting.is_none()
 				&& !state.keyboard_modifiers.command()
-				&& (!c.is_control() || c == '\n' || c == '\r')
+				&& (!c.is_control() || c == '\n' || c == '\r' || c == '\t')
 			{
 				let mut editor = Editor::new(value, &mut state.cursor);
 
@@ -363,6 +380,7 @@ where
 					text_bounds.size(),
 					font.clone(),
 					size,
+					tab_width,
 				);
 
 				return event::Status::Captured;
@@ -400,6 +418,7 @@ where
 							text_bounds.size(),
 							font.clone(),
 							size,
+							tab_width,
 						);
 					}
 					keyboard::KeyCode::Delete => {
@@ -421,6 +440,7 @@ where
 							text_bounds.size(),
 							font.clone(),
 							size,
+							tab_width,
 						);
 					}
 					keyboard::KeyCode::Left => {
@@ -442,6 +462,7 @@ where
 							text_bounds.size(),
 							font.clone(),
 							size,
+							tab_width,
 						);
 					}
 					keyboard::KeyCode::Right => {
@@ -463,6 +484,7 @@ where
 							text_bounds.size(),
 							font.clone(),
 							size,
+							tab_width,
 						);
 					}
 					keyboard::KeyCode::Up => {
@@ -471,31 +493,14 @@ where
 								value,
 								renderer,
 								font.clone(),
+								tab_width,
 							)
 						} else {
-							state.cursor.move_up(value, renderer, font.clone());
-						}
-
-						state.recalculate_scroll_offset(
-							renderer,
-							value,
-							text_bounds.size(),
-							font.clone(),
-							size,
-						);
-					}
-					keyboard::KeyCode::Down => {
-						if modifiers.shift() {
-							state.cursor.select_down(
+							state.cursor.move_up(
 								value,
 								renderer,
 								font.clone(),
-							)
-						} else {
-							state.cursor.move_down(
-								value,
-								renderer,
-								font.clone(),
+								tab_width,
 							);
 						}
 
@@ -505,6 +510,33 @@ where
 							text_bounds.size(),
 							font.clone(),
 							size,
+							tab_width,
+						);
+					}
+					keyboard::KeyCode::Down => {
+						if modifiers.shift() {
+							state.cursor.select_down(
+								value,
+								renderer,
+								font.clone(),
+								tab_width,
+							)
+						} else {
+							state.cursor.move_down(
+								value,
+								renderer,
+								font.clone(),
+								tab_width,
+							);
+						}
+
+						state.recalculate_scroll_offset(
+							renderer,
+							value,
+							text_bounds.size(),
+							font.clone(),
+							size,
+							tab_width,
 						);
 					}
 					keyboard::KeyCode::Home => {
@@ -531,6 +563,7 @@ where
 								text_bounds.size(),
 								font.clone(),
 								size,
+								tab_width,
 							);
 						}
 					}
@@ -556,6 +589,7 @@ where
 							text_bounds.size(),
 							font.clone(),
 							size,
+							tab_width,
 						);
 					}
 					keyboard::KeyCode::C
@@ -564,7 +598,7 @@ where
 						match state.cursor.selection(value) {
 							Some((start, end)) => {
 								clipboard.write(
-									value.select(start, end).to_string(),
+									value.select(start, end).to_string(None),
 								);
 							}
 							None => {}
@@ -576,7 +610,7 @@ where
 						match state.cursor.selection(value) {
 							Some((start, end)) => {
 								clipboard.write(
-									value.select(start, end).to_string(),
+									value.select(start, end).to_string(None),
 								);
 
 								let mut editor =
@@ -592,6 +626,7 @@ where
 									text_bounds.size(),
 									font.clone(),
 									size,
+									tab_width,
 								);
 							}
 							None => {}
@@ -608,7 +643,8 @@ where
 										.chars()
 										.filter(|&c| {
 											!c.is_control()
-												|| c == '\n' || c == '\r'
+												|| c == '\n' || c == '\r' || c
+												== '\t'
 										})
 										.collect();
 
@@ -632,6 +668,7 @@ where
 								text_bounds.size(),
 								font.clone(),
 								size,
+								tab_width,
 							);
 						} else {
 							state.is_pasting = None;
@@ -648,6 +685,7 @@ where
 							text_bounds.size(),
 							font.clone(),
 							size,
+							tab_width,
 						);
 					}
 					keyboard::KeyCode::Escape => {
@@ -663,6 +701,7 @@ where
 							text_bounds.size(),
 							font.clone(),
 							size,
+							tab_width,
 						);
 					}
 					keyboard::KeyCode::Tab => {
@@ -713,6 +752,7 @@ pub fn draw<Renderer>(
 	value: &Value,
 	placeholder: &str,
 	size: Option<u16>,
+	tab_width: u8,
 	font: &Renderer::Font,
 	style_sheet: &dyn StyleSheet,
 ) where
@@ -741,7 +781,6 @@ pub fn draw<Renderer>(
 		style.background,
 	);
 
-	let text = value.to_string();
 	let size = size.unwrap_or_else(|| renderer.default_size());
 
 	let (selections, cursor) = if state.is_focused() {
@@ -753,6 +792,7 @@ pub fn draw<Renderer>(
 					renderer,
 					font.clone(),
 					size,
+					tab_width,
 				);
 
 				(vec![], Some(point))
@@ -774,6 +814,7 @@ pub fn draw<Renderer>(
 						renderer,
 						font.clone(),
 						Some(size),
+						tab_width,
 					);
 					let right_x = offset_x_of_index(
 						right,
@@ -781,6 +822,7 @@ pub fn draw<Renderer>(
 						renderer,
 						font.clone(),
 						Some(size),
+						tab_width,
 					);
 
 					(Point::new(left_x, left_y), Point::new(right_x, right_y))
@@ -840,6 +882,7 @@ pub fn draw<Renderer>(
 								renderer,
 								font.clone(),
 								Some(size),
+								tab_width,
 							)
 						};
 
@@ -907,11 +950,13 @@ pub fn draw<Renderer>(
 		for (selection, color) in selections {
 			renderer.fill_quad(selection, color);
 		}
-		let color = if text.is_empty() {
+		let color = if value.is_empty() {
 			style_sheet.placeholder_color()
 		} else {
 			style_sheet.value_color()
 		};
+
+		let text = value.to_string(tab_width);
 
 		let content: Cow<str> = match text.chars().next_back() {
 			None => placeholder.into(),
@@ -1007,6 +1052,7 @@ where
 			shell,
 			&mut self.value,
 			self.size,
+			self.tab_width,
 			&self.font,
 			self.on_change.as_ref(),
 			&self.on_submit,
@@ -1098,9 +1144,17 @@ impl State {
 		bounds_size: Size<f32>,
 		font: Renderer::Font,
 		size: u16,
+		tab_width: u8,
 	) {
 		let cursor_index = self.cursor.end(value);
-		let cursor = offset_of_index(cursor_index, value, renderer, font, size);
+		let cursor = offset_of_index(
+			cursor_index,
+			value,
+			renderer,
+			font,
+			size,
+			tab_width,
+		);
 
 		let x = if cursor.x < self.scroll.x {
 			cursor.x
@@ -1151,6 +1205,7 @@ fn index_at_point<Renderer>(
 	renderer: &Renderer,
 	font: Renderer::Font,
 	size: u16,
+	tab_width: u8,
 	value: &Value,
 	state: &State,
 	mut point: Point,
@@ -1167,9 +1222,9 @@ where
 		None => return Some(value.len()),
 	};
 
-	let line = value
-		.select(line_start, value.next_end_of_line(line_start))
-		.to_string();
+	let line_end = value.next_end_of_line(line_start);
+
+	let line = value.select(line_start, line_end).to_string(tab_width);
 
 	if line.is_empty() {
 		return Some(line_start);
@@ -1178,7 +1233,12 @@ where
 	renderer
 		.hit_test(&line, size.into(), font, Size::INFINITY, point, true)
 		.map(text::Hit::cursor)
-		.map(|index| index + line_start)
+		.map(|index| {
+			let num_tabs = value.count_tabs_between(line_start, line_end);
+			let num_virtual_spaces =
+				num_tabs * (tab_width.saturating_sub(1)) as usize;
+			index + line_start - num_virtual_spaces
+		})
 }
 
 fn offset_x_of_index<Renderer>(
@@ -1187,12 +1247,13 @@ fn offset_x_of_index<Renderer>(
 	renderer: &Renderer,
 	font: Renderer::Font,
 	size: Option<u16>,
+	tab_width: u8,
 ) -> f32
 where
 	Renderer: text::Renderer,
 {
 	let line_start = value.previous_start_of_line(index);
-	width_of_range(line_start, index, value, renderer, font, size)
+	width_of_range(line_start, index, value, renderer, font, size, tab_width)
 }
 
 fn offset_y_of_index(index: usize, value: &Value, size: u16) -> f32 {
@@ -1207,13 +1268,14 @@ fn width_of_range<Renderer>(
 	renderer: &Renderer,
 	font: Renderer::Font,
 	size: Option<u16>,
+	tab_width: u8,
 ) -> f32
 where
 	Renderer: text::Renderer,
 {
 	let range = value.select(start, end);
 	renderer.measure_width(
-		&range.to_string(),
+		&range.to_string(tab_width),
 		size.unwrap_or_else(|| renderer.default_size()),
 		font,
 	)
@@ -1225,12 +1287,13 @@ fn offset_of_index<Renderer>(
 	renderer: &Renderer,
 	font: Renderer::Font,
 	size: u16,
+	tab_width: u8,
 ) -> Point
 where
 	Renderer: text::Renderer,
 {
 	Point::new(
-		offset_x_of_index(index, value, renderer, font, Some(size)),
+		offset_x_of_index(index, value, renderer, font, Some(size), tab_width),
 		offset_y_of_index(index, value, size),
 	)
 }
@@ -1240,12 +1303,13 @@ fn max_line_length<Renderer>(
 	renderer: &Renderer,
 	font: Renderer::Font,
 	size: u16,
+	tab_width: u8,
 ) -> f32
 where
 	Renderer: text::Renderer,
 {
 	value
-		.lines()
+		.lines(tab_width)
 		.map(|s| {
 			NotNan::new(renderer.measure_width(&s, size, font.clone())).unwrap()
 		})

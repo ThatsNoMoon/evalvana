@@ -130,6 +130,7 @@ impl Cursor {
 		value: &Value,
 		renderer: &Renderer,
 		font: Renderer::Font,
+		tab_width: u8,
 	) where
 		Renderer: text::Renderer,
 	{
@@ -141,6 +142,7 @@ impl Cursor {
 					value,
 					renderer,
 					font,
+					tab_width,
 				);
 				self.move_to_impl(new_index);
 				self.offset_x_hint = Some(offset_x);
@@ -152,6 +154,7 @@ impl Cursor {
 					value,
 					renderer,
 					font,
+					tab_width,
 				);
 				self.move_to_impl(new_index);
 				self.offset_x_hint = Some(offset_x);
@@ -165,6 +168,7 @@ impl Cursor {
 		value: &Value,
 		renderer: &Renderer,
 		font: Renderer::Font,
+		tab_width: u8,
 	) where
 		Renderer: text::Renderer,
 	{
@@ -176,6 +180,7 @@ impl Cursor {
 					value,
 					renderer,
 					font,
+					tab_width,
 				);
 				self.move_to_impl(new_index);
 				self.offset_x_hint = Some(offset_x);
@@ -187,6 +192,7 @@ impl Cursor {
 					value,
 					renderer,
 					font,
+					tab_width,
 				);
 				self.move_to_impl(new_index);
 				self.offset_x_hint = Some(offset_x);
@@ -284,6 +290,7 @@ impl Cursor {
 		value: &Value,
 		renderer: &Renderer,
 		font: Renderer::Font,
+		tab_width: u8,
 	) where
 		Renderer: text::Renderer,
 	{
@@ -295,6 +302,7 @@ impl Cursor {
 					value,
 					renderer,
 					font,
+					tab_width,
 				);
 				self.select_range_impl(index, above);
 				self.offset_x_hint = Some(offset_x);
@@ -306,6 +314,7 @@ impl Cursor {
 					value,
 					renderer,
 					font,
+					tab_width,
 				);
 				self.select_range_impl(start, above);
 				self.offset_x_hint = Some(offset_x);
@@ -319,6 +328,7 @@ impl Cursor {
 		value: &Value,
 		renderer: &Renderer,
 		font: Renderer::Font,
+		tab_width: u8,
 	) where
 		Renderer: text::Renderer,
 	{
@@ -330,6 +340,7 @@ impl Cursor {
 					value,
 					renderer,
 					font,
+					tab_width,
 				);
 				self.select_range_impl(index, below);
 				self.offset_x_hint = Some(offset_x);
@@ -341,6 +352,7 @@ impl Cursor {
 					value,
 					renderer,
 					font,
+					tab_width,
 				);
 				self.select_range_impl(start, below);
 				self.offset_x_hint = Some(offset_x);
@@ -379,6 +391,7 @@ fn find_index_above<Renderer>(
 	value: &Value,
 	renderer: &Renderer,
 	font: Renderer::Font,
+	tab_width: u8,
 ) -> (usize, f32)
 where
 	Renderer: text::Renderer,
@@ -402,6 +415,7 @@ where
 			renderer,
 			font.clone(),
 			None,
+			tab_width,
 		),
 	};
 
@@ -415,7 +429,7 @@ where
 
 	let index_above = renderer
 		.hit_test(
-			&previous_line.to_string(),
+			&previous_line.to_string(tab_width),
 			size,
 			font,
 			Size::INFINITY,
@@ -437,6 +451,7 @@ fn find_index_below<Renderer>(
 	value: &Value,
 	renderer: &Renderer,
 	font: Renderer::Font,
+	tab_width: u8,
 ) -> (usize, f32)
 where
 	Renderer: text::Renderer,
@@ -446,7 +461,14 @@ where
 	if next_line_start >= value.len() {
 		return (
 			value.len(),
-			offset_x_of_index(value.len(), value, renderer, font, None),
+			offset_x_of_index(
+				value.len(),
+				value,
+				renderer,
+				font,
+				None,
+				tab_width,
+			),
 		);
 	}
 
@@ -454,7 +476,14 @@ where
 
 	let offset_x = match offset_x_hint {
 		Some(x) => x,
-		None => offset_x_of_index(index, value, renderer, font.clone(), None),
+		None => offset_x_of_index(
+			index,
+			value,
+			renderer,
+			font.clone(),
+			None,
+			tab_width,
+		),
 	};
 
 	if next_line_start == next_line_end {
@@ -467,7 +496,7 @@ where
 
 	let index_below = renderer
 		.hit_test(
-			&next_line.to_string(),
+			&next_line.to_string(tab_width),
 			size,
 			font,
 			Size::INFINITY,
