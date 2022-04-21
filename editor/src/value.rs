@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use unicode_segmentation::UnicodeSegmentation;
 
 /// The value of a [`TextInput`].
@@ -31,6 +33,23 @@ impl Value {
 		self.graphemes.len()
 	}
 
+	pub fn lines(&self) -> impl Iterator<Item = String> + '_ {
+		let mut start = 0;
+		std::iter::from_fn(move || match start.cmp(&self.graphemes.len()) {
+			Ordering::Greater => None,
+			Ordering::Equal => {
+				start += 1;
+				Some(String::new())
+			}
+			Ordering::Less => {
+				let end = self.next_end_of_line(start);
+				let slice = &self.graphemes[start..=end.min(self.len() - 1)];
+				start = end + 1;
+				Some(slice.concat())
+			}
+		})
+	}
+
 	/// Returns the number of times the given grapheme appears in the [`Value`].
 	pub fn count_lines(&self) -> usize {
 		self.graphemes
@@ -45,6 +64,29 @@ impl Value {
 			.iter()
 			.filter(|&g| g == "\n" || g == "\r\n")
 			.count()
+	}
+
+	/// Returns the number of times the given grapheme appears in the [`Value`].
+	pub fn count_lines_between(&self, start: usize, end: usize) -> usize {
+		self.graphemes[start..end.min(self.len())]
+			.iter()
+			.filter(|&g| g == "\n" || g == "\r\n")
+			.count()
+	}
+
+	/// Returns the `n`th line in the [`Value`].
+	pub fn nth_line_start(&self, n: usize) -> Option<usize> {
+		if n == 0 {
+			Some(0)
+		} else {
+			self.graphemes
+				.iter()
+				.enumerate()
+				.filter(|&(_, g)| g == "\n" || g == "\r\n")
+				.nth(n - 1)
+				.map(|(i, _)| i + 1)
+				.filter(|&i| i < self.graphemes.len())
+		}
 	}
 
 	/// Returns the position of the previous start of a word from the given

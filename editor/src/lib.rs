@@ -21,6 +21,7 @@ use iced_native::{
 	touch, Clipboard, Element, Layout, Length, Padding, Point, Rectangle,
 	Shell, Size, Widget,
 };
+use ordered_float::NotNan;
 use style::StyleSheet;
 pub use value::Value;
 
@@ -224,27 +225,29 @@ where
 	Message: Clone,
 	Renderer: text::Renderer,
 {
+	let state = state();
+	let size = size.unwrap_or_else(|| renderer.default_size());
+	let text_bounds = layout.children().next().unwrap().bounds();
+
+	state.new_size(size);
+
 	match event {
 		Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
 		| Event::Touch(touch::Event::FingerPressed { .. }) => {
-			let state = state();
 			let is_clicked = layout.bounds().contains(cursor_position);
 
 			state.is_focused = is_clicked;
 
 			if is_clicked {
-				let text_layout = layout.children().next().unwrap();
-				let offset = cursor_position - text_layout.bounds().position();
-
+				let offset = cursor_position - text_bounds.position();
 				let click =
 					mouse::Click::new(cursor_position, state.last_click);
 
 				match click.kind() {
 					click::Kind::Single => {
 						let position = if offset != Vector::new(0.0, 0.0) {
-							find_cursor_position(
+							index_at_point(
 								renderer,
-								text_layout.bounds(),
 								font.clone(),
 								size,
 								value,
@@ -259,9 +262,8 @@ where
 						state.is_dragging = true;
 					}
 					click::Kind::Double => {
-						let position = find_cursor_position(
+						let position = index_at_point(
 							renderer,
-							text_layout.bounds(),
 							font.clone(),
 							size,
 							value,
@@ -291,19 +293,15 @@ where
 		Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
 		| Event::Touch(touch::Event::FingerLifted { .. })
 		| Event::Touch(touch::Event::FingerLost { .. }) => {
-			state().is_dragging = false;
+			state.is_dragging = false;
 		}
 		Event::Mouse(mouse::Event::CursorMoved { position })
 		| Event::Touch(touch::Event::FingerMoved { position, .. }) => {
-			let state = state();
-
 			if state.is_dragging {
-				let text_layout = layout.children().next().unwrap();
-				let offset = position - text_layout.bounds().position();
+				let offset = position - text_bounds.position();
 
-				let position = find_cursor_position(
+				let position = index_at_point(
 					renderer,
-					text_layout.bounds(),
 					font.clone(),
 					size,
 					value,
@@ -319,9 +317,30 @@ where
 				return event::Status::Captured;
 			}
 		}
-		Event::Keyboard(keyboard::Event::CharacterReceived(c)) => {
-			let state = state();
+		Event::Mouse(mouse::Event::WheelScrolled { delta }) => {
+			let delta = match delta {
+				mouse::ScrollDelta::Lines { x, y } => {
+					let size = f32::from(size);
+					Vector::new(x * size, y * size * -1.0)
+				}
+				mouse::ScrollDelta::Pixels { x, y } => Vector::new(x, y),
+			};
 
+			if delta.y.abs() > 0.1 {
+				state.scroll.y = (state.scroll.y + delta.y)
+					.max(0.0)
+					.min(value.count_lines() as f32 * f32::from(size));
+			}
+
+			if delta.x.abs() > 0.1 {
+				let max =
+					(max_line_length(value, renderer, font.clone(), size)
+						- text_bounds.width)
+						.max(0.0);
+				state.scroll.x = (state.scroll.x + delta.x).max(0.0).min(max);
+			}
+		}
+		Event::Keyboard(keyboard::Event::CharacterReceived(c)) => {
 			if state.is_focused
 				&& state.is_pasting.is_none()
 				&& !state.keyboard_modifiers.command()
@@ -338,12 +357,18 @@ where
 				let message = (on_change)(editor.contents());
 				shell.publish(message);
 
+				state.recalculate_scroll_offset(
+					renderer,
+					value,
+					text_bounds.size(),
+					font.clone(),
+					size,
+				);
+
 				return event::Status::Captured;
 			}
 		}
 		Event::Keyboard(keyboard::Event::KeyPressed { key_code, .. }) => {
-			let state = state();
-
 			if state.is_focused {
 				let modifiers = state.keyboard_modifiers;
 
@@ -368,6 +393,14 @@ where
 
 						let message = (on_change)(editor.contents());
 						shell.publish(message);
+
+						state.recalculate_scroll_offset(
+							renderer,
+							value,
+							text_bounds.size(),
+							font.clone(),
+							size,
+						);
 					}
 					keyboard::KeyCode::Delete => {
 						if platform::is_jump_modifier_pressed(modifiers)
@@ -381,6 +414,14 @@ where
 
 						let message = (on_change)(editor.contents());
 						shell.publish(message);
+
+						state.recalculate_scroll_offset(
+							renderer,
+							value,
+							text_bounds.size(),
+							font.clone(),
+							size,
+						);
 					}
 					keyboard::KeyCode::Left => {
 						if platform::is_jump_modifier_pressed(modifiers) {
@@ -394,6 +435,14 @@ where
 						} else {
 							state.cursor.move_left(value);
 						}
+
+						state.recalculate_scroll_offset(
+							renderer,
+							value,
+							text_bounds.size(),
+							font.clone(),
+							size,
+						);
 					}
 					keyboard::KeyCode::Right => {
 						if platform::is_jump_modifier_pressed(modifiers) {
@@ -407,6 +456,14 @@ where
 						} else {
 							state.cursor.move_right(value);
 						}
+
+						state.recalculate_scroll_offset(
+							renderer,
+							value,
+							text_bounds.size(),
+							font.clone(),
+							size,
+						);
 					}
 					keyboard::KeyCode::Up => {
 						if modifiers.shift() {
@@ -418,6 +475,14 @@ where
 						} else {
 							state.cursor.move_up(value, renderer, font.clone());
 						}
+
+						state.recalculate_scroll_offset(
+							renderer,
+							value,
+							text_bounds.size(),
+							font.clone(),
+							size,
+						);
 					}
 					keyboard::KeyCode::Down => {
 						if modifiers.shift() {
@@ -433,6 +498,14 @@ where
 								font.clone(),
 							);
 						}
+
+						state.recalculate_scroll_offset(
+							renderer,
+							value,
+							text_bounds.size(),
+							font.clone(),
+							size,
+						);
 					}
 					keyboard::KeyCode::Home => {
 						if platform::is_jump_modifier_pressed(modifiers) {
@@ -443,10 +516,22 @@ where
 							} else {
 								state.cursor.move_to(0);
 							}
-						} else if modifiers.shift() {
-							state.cursor.select_left_by_line(value);
+
+							state.scroll = Vector::new(0.0, 0.0);
 						} else {
-							state.cursor.move_left_by_line(value);
+							if modifiers.shift() {
+								state.cursor.select_left_by_line(value);
+							} else {
+								state.cursor.move_left_by_line(value);
+							}
+
+							state.recalculate_scroll_offset(
+								renderer,
+								value,
+								text_bounds.size(),
+								font.clone(),
+								size,
+							);
 						}
 					}
 					keyboard::KeyCode::End => {
@@ -464,6 +549,14 @@ where
 						} else {
 							state.cursor.move_right_by_line(value);
 						}
+
+						state.recalculate_scroll_offset(
+							renderer,
+							value,
+							text_bounds.size(),
+							font.clone(),
+							size,
+						);
 					}
 					keyboard::KeyCode::C
 						if state.keyboard_modifiers.command() =>
@@ -485,15 +578,24 @@ where
 								clipboard.write(
 									value.select(start, end).to_string(),
 								);
+
+								let mut editor =
+									Editor::new(value, &mut state.cursor);
+								editor.delete();
+
+								let message = (on_change)(editor.contents());
+								shell.publish(message);
+
+								state.recalculate_scroll_offset(
+									renderer,
+									value,
+									text_bounds.size(),
+									font.clone(),
+									size,
+								);
 							}
 							None => {}
 						}
-
-						let mut editor = Editor::new(value, &mut state.cursor);
-						editor.delete();
-
-						let message = (on_change)(editor.contents());
-						shell.publish(message);
 					}
 					keyboard::KeyCode::V => {
 						if state.keyboard_modifiers.command() {
@@ -523,6 +625,14 @@ where
 							shell.publish(message);
 
 							state.is_pasting = Some(content);
+
+							state.recalculate_scroll_offset(
+								renderer,
+								value,
+								text_bounds.size(),
+								font.clone(),
+								size,
+							);
 						} else {
 							state.is_pasting = None;
 						}
@@ -531,14 +641,29 @@ where
 						if state.keyboard_modifiers.command() =>
 					{
 						state.cursor.select_all(value);
+
+						state.recalculate_scroll_offset(
+							renderer,
+							value,
+							text_bounds.size(),
+							font.clone(),
+							size,
+						);
 					}
 					keyboard::KeyCode::Escape => {
-						state.is_focused = false;
 						state.is_dragging = false;
 						state.is_pasting = None;
 
 						state.keyboard_modifiers =
 							keyboard::Modifiers::default();
+
+						state.recalculate_scroll_offset(
+							renderer,
+							value,
+							text_bounds.size(),
+							font.clone(),
+							size,
+						);
 					}
 					keyboard::KeyCode::Tab => {
 						return event::Status::Ignored;
@@ -550,8 +675,6 @@ where
 			}
 		}
 		Event::Keyboard(keyboard::Event::KeyReleased { key_code, .. }) => {
-			let state = state();
-
 			if state.is_focused {
 				match key_code {
 					keyboard::KeyCode::V => {
@@ -569,8 +692,6 @@ where
 			}
 		}
 		Event::Keyboard(keyboard::Event::ModifiersChanged(modifiers)) => {
-			let state = state();
-
 			if state.is_focused {
 				state.keyboard_modifiers = modifiers;
 			}
@@ -587,7 +708,7 @@ where
 pub fn draw<Renderer>(
 	renderer: &mut Renderer,
 	layout: Layout<'_>,
-	cursor_position: Point,
+	pointer_position: Point,
 	state: &State,
 	value: &Value,
 	placeholder: &str,
@@ -600,7 +721,7 @@ pub fn draw<Renderer>(
 	let bounds = layout.bounds();
 	let text_bounds = layout.children().next().unwrap().bounds();
 
-	let is_mouse_over = bounds.contains(cursor_position);
+	let is_mouse_over = bounds.contains(pointer_position);
 
 	let style = if state.is_focused() {
 		style_sheet.focused()
@@ -623,43 +744,47 @@ pub fn draw<Renderer>(
 	let text = value.to_string();
 	let size = size.unwrap_or_else(|| renderer.default_size());
 
-	let (selections, cursor, offset) = if state.is_focused() {
+	let (selections, cursor) = if state.is_focused() {
 		match state.cursor.state(value) {
 			cursor::State::Index(position) => {
-				let (point, offset) = measure_cursor_and_scroll_offset(
-					renderer,
-					text_bounds,
-					value,
-					size,
+				let point = offset_of_index(
 					position,
+					value,
+					renderer,
 					font.clone(),
+					size,
 				);
 
-				(vec![], Some(point), offset)
+				(vec![], Some(point))
 			}
 			cursor::State::Selection { start, end } => {
 				let left = start.min(end);
 				let right = end.max(start);
 
-				let (left_point, left_offset) =
-					measure_cursor_and_scroll_offset(
-						renderer,
-						text_bounds,
-						value,
-						size,
+				let (left_point, right_point) = {
+					let left_y =
+						value.count_lines_before(left) as f32 * f32::from(size);
+					let right_y = left_y
+						+ value.count_lines_between(left, right) as f32
+							* f32::from(size);
+
+					let left_x = offset_x_of_index(
 						left,
+						value,
+						renderer,
 						font.clone(),
+						Some(size),
+					);
+					let right_x = offset_x_of_index(
+						right,
+						value,
+						renderer,
+						font.clone(),
+						Some(size),
 					);
 
-				let (right_point, right_offset) =
-					measure_cursor_and_scroll_offset(
-						renderer,
-						text_bounds,
-						value,
-						size,
-						right,
-						font.clone(),
-					);
+					(Point::new(left_x, left_y), Point::new(right_x, right_y))
+				};
 
 				let selection_quads = if left_point.y == right_point.y {
 					vec![(
@@ -739,32 +864,33 @@ pub fn draw<Renderer>(
 					} else {
 						Some(right_point)
 					},
-					if end == right {
-						right_offset
-					} else {
-						left_offset
-					},
 				)
 			}
 		}
 	} else {
-		(vec![], None, 0.0)
+		(vec![], None)
 	};
 
 	let cursor = cursor
+		.map(|point| {
+			point + (text_bounds.position() - Point::ORIGIN) - state.scroll
+		})
 		.filter(|&point| {
-			bounds.contains(point + (text_bounds.position() - Point::ORIGIN))
+			let bottom = point + Vector::new(0.0, f32::from(size));
+			text_bounds.contains(point) || text_bounds.contains(bottom)
 		})
 		.map(|point| {
-			let y = text_bounds.y + point.y - 1.0;
+			let y = f32::max(point.y - 1.0, text_bounds.y);
 
-			let height =
-				f32::min(f32::from(size) + 2.0, bounds.y + bounds.height - y);
+			let height = f32::min(
+				f32::from(size) + 2.0,
+				text_bounds.y + text_bounds.height - y,
+			);
 
 			(
 				renderer::Quad {
 					bounds: Rectangle {
-						x: text_bounds.x + point.x - 1.0,
+						x: point.x - 1.0,
 						y,
 						width: 2.0,
 						height,
@@ -777,21 +903,10 @@ pub fn draw<Renderer>(
 			)
 		});
 
-	let text_width = renderer.measure_width(
-		if text.is_empty() { placeholder } else { &text },
-		size,
-		font.clone(),
-	);
-
 	let render = |renderer: &mut Renderer| {
 		for (selection, color) in selections {
 			renderer.fill_quad(selection, color);
 		}
-
-		if let Some((cursor, color)) = cursor {
-			renderer.fill_quad(cursor, color);
-		}
-
 		let color = if text.is_empty() {
 			style_sheet.placeholder_color()
 		} else {
@@ -814,6 +929,7 @@ pub fn draw<Renderer>(
 			font: font.clone(),
 			bounds: Rectangle {
 				width: f32::INFINITY,
+				height: f32::INFINITY,
 				..text_bounds
 			},
 			size: f32::from(size),
@@ -822,12 +938,12 @@ pub fn draw<Renderer>(
 		});
 	};
 
-	if text_width > text_bounds.width {
-		renderer.with_layer(text_bounds, |renderer| {
-			renderer.with_translation(Vector::new(-offset, 0.0), render)
-		});
-	} else {
-		render(renderer);
+	renderer.with_layer(text_bounds, |renderer| {
+		renderer.with_translation(state.scroll * -1.0, render);
+	});
+
+	if let Some((cursor, color)) = cursor {
+		renderer.fill_quad(cursor, color);
 	}
 }
 
@@ -934,7 +1050,7 @@ where
 }
 
 /// The state of a [`TextInput`].
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct State {
 	is_focused: bool,
 	is_dragging: bool,
@@ -942,65 +1058,78 @@ pub struct State {
 	last_click: Option<mouse::Click>,
 	cursor: Cursor,
 	keyboard_modifiers: keyboard::Modifiers,
-	// TODO: Add stateful horizontal scrolling offset
+	scroll: Vector,
+	last_size: u16,
 }
 
-impl State {
-	/// Creates a new [`State`], representing an unfocused [`TextInput`].
-	pub fn new() -> Self {
-		Self::default()
-	}
-
-	/// Creates a new [`State`], representing a focused [`TextInput`].
-	pub fn focused() -> Self {
+impl Default for State {
+	fn default() -> Self {
 		Self {
-			is_focused: true,
+			is_focused: false,
 			is_dragging: false,
 			is_pasting: None,
 			last_click: None,
 			cursor: Cursor::default(),
 			keyboard_modifiers: keyboard::Modifiers::default(),
+			scroll: Vector::new(0.0, 0.0),
+			last_size: 1,
+		}
+	}
+}
+
+impl State {
+	/// Creates a new [`State`], representing a focused [`TextInput`].
+	pub fn focused() -> Self {
+		Self {
+			is_focused: true,
+			..Default::default()
 		}
 	}
 
 	/// Returns whether the [`TextInput`] is currently focused or not.
-	pub fn is_focused(&self) -> bool {
+	fn is_focused(&self) -> bool {
 		self.is_focused
 	}
 
-	/// Returns the [`Cursor`] of the [`TextInput`].
-	pub fn cursor(&self) -> Cursor {
-		self.cursor
+	fn recalculate_scroll_offset<Renderer: text::Renderer>(
+		&mut self,
+		renderer: &Renderer,
+		value: &Value,
+		bounds_size: Size<f32>,
+		font: Renderer::Font,
+		size: u16,
+	) {
+		let cursor_index = self.cursor.end(value);
+		let cursor = offset_of_index(cursor_index, value, renderer, font, size);
+
+		let x = if cursor.x < self.scroll.x {
+			cursor.x
+		} else if cursor.x > self.scroll.x + bounds_size.width {
+			cursor.x - bounds_size.width
+		} else {
+			self.scroll.x
+		};
+
+		let y = if cursor.y < self.scroll.y {
+			cursor.y
+		} else if cursor.y + f32::from(size)
+			> self.scroll.y + bounds_size.height
+		{
+			cursor.y + f32::from(size) - bounds_size.height
+		} else {
+			self.scroll.y
+		};
+
+		self.scroll = Vector::new(x, y);
 	}
 
-	/// Focuses the [`TextInput`].
-	pub fn focus(&mut self) {
-		self.is_focused = true;
-	}
+	fn new_size(&mut self, size: u16) {
+		if size != self.last_size {
+			let factor = f32::from(size) / f32::from(self.last_size);
+			self.last_size = size;
 
-	/// Unfocuses the [`TextInput`].
-	pub fn unfocus(&mut self) {
-		self.is_focused = false;
-	}
-
-	/// Moves the [`Cursor`] of the [`TextInput`] to the front of the input text.
-	pub fn move_cursor_to_front(&mut self) {
-		self.cursor.move_to(0);
-	}
-
-	/// Moves the [`Cursor`] of the [`TextInput`] to the end of the input text.
-	pub fn move_cursor_to_end(&mut self) {
-		self.cursor.move_to(usize::MAX);
-	}
-
-	/// Moves the [`Cursor`] of the [`TextInput`] to an arbitrary location.
-	pub fn move_cursor_to(&mut self, position: usize) {
-		self.cursor.move_to(position);
-	}
-
-	/// Selects all the content of the [`TextInput`].
-	pub fn select_all(&mut self) {
-		self.cursor.select_range(0, usize::MAX);
+			self.scroll = self.scroll * factor;
+		}
 	}
 }
 
@@ -1016,75 +1145,12 @@ mod platform {
 	}
 }
 
-fn offset<Renderer>(
-	renderer: &Renderer,
-	text_bounds: Rectangle,
-	font: Renderer::Font,
-	size: u16,
-	value: &Value,
-	state: &State,
-) -> f32
-where
-	Renderer: text::Renderer,
-{
-	if state.is_focused() {
-		let cursor = state.cursor();
-
-		let focus_position = match cursor.state(value) {
-			cursor::State::Index(i) => i,
-			cursor::State::Selection { end, .. } => end,
-		};
-
-		let (_, offset) = measure_cursor_and_scroll_offset(
-			renderer,
-			text_bounds,
-			value,
-			size,
-			focus_position,
-			font,
-		);
-
-		offset
-	} else {
-		0.0
-	}
-}
-
-fn measure_cursor_and_scroll_offset<Renderer>(
-	renderer: &Renderer,
-	text_bounds: Rectangle,
-	value: &Value,
-	size: u16,
-	cursor_index: usize,
-	font: Renderer::Font,
-) -> (Point, f32)
-where
-	Renderer: text::Renderer,
-{
-	let lines_before_cursor = value.count_lines_before(cursor_index);
-
-	let line_before_cursor = value
-		.select(value.previous_start_of_line(cursor_index), cursor_index)
-		.to_string();
-
-	let text_value_width =
-		renderer.measure_width(&line_before_cursor, size, font);
-
-	let offset = ((text_value_width + 5.0) - text_bounds.width).max(0.0);
-
-	let point =
-		Point::new(text_value_width, lines_before_cursor as f32 * size as f32);
-
-	(point, offset)
-}
-
 /// Computes the position of the text cursor at the given point of a
 /// [`TextInput`].
-fn find_cursor_position<Renderer>(
+fn index_at_point<Renderer>(
 	renderer: &Renderer,
-	text_bounds: Rectangle,
 	font: Renderer::Font,
-	size: Option<u16>,
+	size: u16,
 	value: &Value,
 	state: &State,
 	mut point: Point,
@@ -1092,23 +1158,23 @@ fn find_cursor_position<Renderer>(
 where
 	Renderer: text::Renderer,
 {
-	let size = size.unwrap_or_else(|| renderer.default_size());
+	point = point + state.scroll;
 
-	let offset =
-		offset(renderer, text_bounds, font.clone(), size, value, state);
+	let line_num = (point.y / f32::from(size)).floor() as usize;
 
-	point.x += offset;
+	let line_start = match value.nth_line_start(line_num) {
+		Some(i) => i,
+		None => return Some(value.len()),
+	};
+
+	let line = value
+		.select(line_start, value.next_end_of_line(line_start))
+		.to_string();
 
 	renderer
-		.hit_test(
-			&value.to_string(),
-			size.into(),
-			font,
-			Size::INFINITY,
-			point,
-			true,
-		)
+		.hit_test(&line, size.into(), font, Size::INFINITY, point, true)
 		.map(text::Hit::cursor)
+		.map(|index| index + line_start)
 }
 
 fn offset_x_of_index<Renderer>(
@@ -1123,6 +1189,11 @@ where
 {
 	let line_start = value.previous_start_of_line(index);
 	width_of_range(line_start, index, value, renderer, font, size)
+}
+
+fn offset_y_of_index(index: usize, value: &Value, size: u16) -> f32 {
+	let lines_before = value.count_lines_before(index);
+	lines_before as f32 * f32::from(size)
 }
 
 fn width_of_range<Renderer>(
@@ -1142,4 +1213,39 @@ where
 		size.unwrap_or_else(|| renderer.default_size()),
 		font,
 	)
+}
+
+fn offset_of_index<Renderer>(
+	index: usize,
+	value: &Value,
+	renderer: &Renderer,
+	font: Renderer::Font,
+	size: u16,
+) -> Point
+where
+	Renderer: text::Renderer,
+{
+	Point::new(
+		offset_x_of_index(index, value, renderer, font, Some(size)),
+		offset_y_of_index(index, value, size),
+	)
+}
+
+fn max_line_length<Renderer>(
+	value: &Value,
+	renderer: &Renderer,
+	font: Renderer::Font,
+	size: u16,
+) -> f32
+where
+	Renderer: text::Renderer,
+{
+	value
+		.lines()
+		.map(|s| {
+			NotNan::new(renderer.measure_width(&s, size, font.clone())).unwrap()
+		})
+		.max()
+		.map(|x| x.into_inner())
+		.unwrap_or(0.0)
 }

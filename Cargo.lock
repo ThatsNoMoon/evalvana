@@ -596,6 +596,7 @@ version = "0.1.0-alpha.1"
 dependencies = [
  "iced_graphics",
  "iced_native",
+ "ordered-float",
  "unicode-segmentation",
 ]
 
