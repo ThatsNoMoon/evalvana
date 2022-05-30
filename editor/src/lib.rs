@@ -4,10 +4,10 @@
 
 pub mod cursor;
 mod editor;
+mod rope_ext;
 pub mod style;
-mod value;
 
-use std::borrow::Cow;
+use std::{borrow::Cow, ops::ControlFlow};
 
 pub use cursor::Cursor;
 use editor::Editor;
@@ -22,8 +22,11 @@ use iced_native::{
 	Shell, Size, Widget,
 };
 use ordered_float::NotNan;
+use rope_ext::RopeExt;
+pub use ropey::Rope;
+use ropey::RopeSlice;
 use style::StyleSheet;
-pub use value::Value;
+use unicode_segmentation::UnicodeSegmentation;
 
 /// A field that can be filled with text.
 ///
@@ -54,7 +57,6 @@ pub use value::Value;
 pub struct TextInput<'a, Message, Renderer: text::Renderer> {
 	state: &'a mut State,
 	placeholder: String,
-	value: Value,
 	font: Renderer::Font,
 	width: Length,
 	height: Length,
@@ -78,19 +80,13 @@ where
 	/// - a placeholder
 	/// - the current value
 	/// - a function that produces a message when the [`TextInput`] changes
-	pub fn new<F>(
-		state: &'a mut State,
-		placeholder: &str,
-		value: &str,
-		on_change: F,
-	) -> Self
+	pub fn new<F>(state: &'a mut State, placeholder: &str, on_change: F) -> Self
 	where
 		F: 'a + Fn(String) -> Message,
 	{
 		TextInput {
 			state,
 			placeholder: String::from(placeholder),
-			value: Value::new(value),
 			font: Default::default(),
 			width: Length::Fill,
 			height: Length::Fill,
@@ -168,14 +164,12 @@ where
 		renderer: &mut Renderer,
 		layout: Layout<'_>,
 		cursor_position: Point,
-		value: Option<&Value>,
 	) {
 		draw(
 			renderer,
 			layout,
 			cursor_position,
 			self.state,
-			value.unwrap_or(&self.value),
 			&self.placeholder,
 			self.size,
 			self.tab_width,
@@ -191,7 +185,7 @@ pub fn layout<Renderer>(
 	limits: &layout::Limits,
 	width: Length,
 	height: Length,
-	value: &Value,
+	value: &Rope,
 	padding: Padding,
 	size: Option<u16>,
 ) -> layout::Node
@@ -200,7 +194,7 @@ where
 {
 	let text_size = size.unwrap_or_else(|| renderer.default_size());
 
-	let line_count = value.count_lines() + 1;
+	let line_count = value.len_lines() + 1;
 
 	let text_height = text_size as usize * line_count;
 
@@ -223,7 +217,6 @@ pub fn update<'a, Message, Renderer>(
 	renderer: &Renderer,
 	clipboard: &mut dyn Clipboard,
 	shell: &mut Shell<'_, Message>,
-	value: &mut Value,
 	size: Option<u16>,
 	tab_width: u8,
 	font: &Renderer::Font,
@@ -261,7 +254,6 @@ where
 								font.clone(),
 								size,
 								tab_width,
-								value,
 								state,
 								Point::ORIGIN + offset,
 							)
@@ -269,7 +261,7 @@ where
 							None
 						};
 
-						state.cursor.move_to(position.unwrap_or(0));
+						state.cursor.move_to_byte(position.unwrap_or(0));
 						state.is_dragging = true;
 					}
 					click::Kind::Double => {
@@ -278,21 +270,20 @@ where
 							font.clone(),
 							size,
 							tab_width,
-							value,
 							state,
 							Point::ORIGIN + offset,
 						)
 						.unwrap_or(0);
 
 						state.cursor.select_range(
-							value.previous_start_of_word(position),
-							value.next_end_of_word(position),
+							state.value.previous_start_of_word(position),
+							state.value.next_end_of_word(position),
 						);
 
 						state.is_dragging = false;
 					}
 					click::Kind::Triple => {
-						state.cursor.select_all(value);
+						state.cursor.select_all(&state.value);
 						state.is_dragging = false;
 					}
 				}
@@ -317,7 +308,6 @@ where
 					font.clone(),
 					size,
 					tab_width,
-					value,
 					state,
 					Point::ORIGIN + offset,
 				)
@@ -325,7 +315,7 @@ where
 
 				state
 					.cursor
-					.select_range(state.cursor.start(value), position);
+					.select_range(state.cursor.start(&state.value), position);
 
 				return event::Status::Captured;
 			}
@@ -342,12 +332,12 @@ where
 			if delta.y.abs() > 0.1 {
 				state.scroll.y = (state.scroll.y + delta.y)
 					.max(0.0)
-					.min(value.count_lines() as f32 * f32::from(size));
+					.min(state.value.len_lines() as f32 * f32::from(size));
 			}
 
 			if delta.x.abs() > 0.1 {
 				let max = (max_line_length(
-					value,
+					&state.value,
 					renderer,
 					font.clone(),
 					size,
@@ -363,7 +353,8 @@ where
 				&& !state.keyboard_modifiers.command()
 				&& (!c.is_control() || c == '\n' || c == '\r' || c == '\t')
 			{
-				let mut editor = Editor::new(value, &mut state.cursor);
+				let mut editor =
+					Editor::new(&mut state.value, &mut state.cursor);
 
 				editor.insert(c);
 
@@ -376,7 +367,6 @@ where
 
 				state.recalculate_scroll_offset(
 					renderer,
-					value,
 					text_bounds.size(),
 					font.clone(),
 					size,
@@ -401,12 +391,13 @@ where
 					}
 					keyboard::KeyCode::Backspace => {
 						if platform::is_jump_modifier_pressed(modifiers)
-							&& state.cursor.selection(value).is_none()
+							&& state.cursor.selection(&state.value).is_none()
 						{
-							state.cursor.select_left_by_words(value);
+							state.cursor.select_left_by_words(&state.value);
 						}
 
-						let mut editor = Editor::new(value, &mut state.cursor);
+						let mut editor =
+							Editor::new(&mut state.value, &mut state.cursor);
 						editor.backspace();
 
 						let message = (on_change)(editor.contents());
@@ -414,7 +405,6 @@ where
 
 						state.recalculate_scroll_offset(
 							renderer,
-							value,
 							text_bounds.size(),
 							font.clone(),
 							size,
@@ -423,12 +413,13 @@ where
 					}
 					keyboard::KeyCode::Delete => {
 						if platform::is_jump_modifier_pressed(modifiers)
-							&& state.cursor.selection(value).is_none()
+							&& state.cursor.selection(&state.value).is_none()
 						{
-							state.cursor.select_right_by_words(value);
+							state.cursor.select_right_by_words(&state.value);
 						}
 
-						let mut editor = Editor::new(value, &mut state.cursor);
+						let mut editor =
+							Editor::new(&mut state.value, &mut state.cursor);
 						editor.delete();
 
 						let message = (on_change)(editor.contents());
@@ -436,7 +427,6 @@ where
 
 						state.recalculate_scroll_offset(
 							renderer,
-							value,
 							text_bounds.size(),
 							font.clone(),
 							size,
@@ -446,19 +436,18 @@ where
 					keyboard::KeyCode::Left => {
 						if platform::is_jump_modifier_pressed(modifiers) {
 							if modifiers.shift() {
-								state.cursor.select_left_by_words(value);
+								state.cursor.select_left_by_words(&state.value);
 							} else {
-								state.cursor.move_left_by_words(value);
+								state.cursor.move_left_by_words(&state.value);
 							}
 						} else if modifiers.shift() {
-							state.cursor.select_left(value)
+							state.cursor.select_left(&state.value)
 						} else {
-							state.cursor.move_left(value);
+							state.cursor.move_left(&state.value);
 						}
 
 						state.recalculate_scroll_offset(
 							renderer,
-							value,
 							text_bounds.size(),
 							font.clone(),
 							size,
@@ -468,19 +457,20 @@ where
 					keyboard::KeyCode::Right => {
 						if platform::is_jump_modifier_pressed(modifiers) {
 							if modifiers.shift() {
-								state.cursor.select_right_by_words(value);
+								state
+									.cursor
+									.select_right_by_words(&state.value);
 							} else {
-								state.cursor.move_right_by_words(value);
+								state.cursor.move_right_by_words(&state.value);
 							}
 						} else if modifiers.shift() {
-							state.cursor.select_right(value)
+							state.cursor.select_right(&state.value)
 						} else {
-							state.cursor.move_right(value);
+							state.cursor.move_right(&state.value);
 						}
 
 						state.recalculate_scroll_offset(
 							renderer,
-							value,
 							text_bounds.size(),
 							font.clone(),
 							size,
@@ -490,14 +480,14 @@ where
 					keyboard::KeyCode::Up => {
 						if modifiers.shift() {
 							state.cursor.select_up(
-								value,
+								&state.value,
 								renderer,
 								font.clone(),
 								tab_width,
 							)
 						} else {
 							state.cursor.move_up(
-								value,
+								&state.value,
 								renderer,
 								font.clone(),
 								tab_width,
@@ -506,7 +496,6 @@ where
 
 						state.recalculate_scroll_offset(
 							renderer,
-							value,
 							text_bounds.size(),
 							font.clone(),
 							size,
@@ -516,14 +505,14 @@ where
 					keyboard::KeyCode::Down => {
 						if modifiers.shift() {
 							state.cursor.select_down(
-								value,
+								&state.value,
 								renderer,
 								font.clone(),
 								tab_width,
 							)
 						} else {
 							state.cursor.move_down(
-								value,
+								&state.value,
 								renderer,
 								font.clone(),
 								tab_width,
@@ -532,7 +521,6 @@ where
 
 						state.recalculate_scroll_offset(
 							renderer,
-							value,
 							text_bounds.size(),
 							font.clone(),
 							size,
@@ -542,24 +530,24 @@ where
 					keyboard::KeyCode::Home => {
 						if platform::is_jump_modifier_pressed(modifiers) {
 							if modifiers.shift() {
-								state
-									.cursor
-									.select_range(state.cursor.start(value), 0);
+								state.cursor.select_range(
+									state.cursor.start(&state.value),
+									0,
+								);
 							} else {
-								state.cursor.move_to(0);
+								state.cursor.move_to_byte(0);
 							}
 
 							state.scroll = Vector::new(0.0, 0.0);
 						} else {
 							if modifiers.shift() {
-								state.cursor.select_left_by_line(value);
+								state.cursor.select_left_by_line(&state.value);
 							} else {
-								state.cursor.move_left_by_line(value);
+								state.cursor.move_left_by_line(&state.value);
 							}
 
 							state.recalculate_scroll_offset(
 								renderer,
-								value,
 								text_bounds.size(),
 								font.clone(),
 								size,
@@ -571,21 +559,22 @@ where
 						if platform::is_jump_modifier_pressed(modifiers) {
 							if modifiers.shift() {
 								state.cursor.select_range(
-									state.cursor.start(value),
-									value.len(),
+									state.cursor.start(&state.value),
+									state.value.len_bytes(),
 								);
 							} else {
-								state.cursor.move_to(value.len());
+								state
+									.cursor
+									.move_to_byte(state.value.len_bytes());
 							}
 						} else if modifiers.shift() {
-							state.cursor.select_right_by_line(value);
+							state.cursor.select_right_by_line(&state.value);
 						} else {
-							state.cursor.move_right_by_line(value);
+							state.cursor.move_right_by_line(&state.value);
 						}
 
 						state.recalculate_scroll_offset(
 							renderer,
-							value,
 							text_bounds.size(),
 							font.clone(),
 							size,
@@ -595,10 +584,13 @@ where
 					keyboard::KeyCode::C
 						if state.keyboard_modifiers.command() =>
 					{
-						match state.cursor.selection(value) {
+						match state.cursor.selection(&state.value) {
 							Some((start, end)) => {
 								clipboard.write(
-									value.select(start, end).to_string(None),
+									state
+										.value
+										.byte_slice(start..end)
+										.to_string(),
 								);
 							}
 							None => {}
@@ -607,14 +599,19 @@ where
 					keyboard::KeyCode::X
 						if state.keyboard_modifiers.command() =>
 					{
-						match state.cursor.selection(value) {
+						match state.cursor.selection(&state.value) {
 							Some((start, end)) => {
 								clipboard.write(
-									value.select(start, end).to_string(None),
+									state
+										.value
+										.byte_slice(start..end)
+										.to_string(),
 								);
 
-								let mut editor =
-									Editor::new(value, &mut state.cursor);
+								let mut editor = Editor::new(
+									&mut state.value,
+									&mut state.cursor,
+								);
 								editor.delete();
 
 								let message = (on_change)(editor.contents());
@@ -622,7 +619,6 @@ where
 
 								state.recalculate_scroll_offset(
 									renderer,
-									value,
 									text_bounds.size(),
 									font.clone(),
 									size,
@@ -634,28 +630,26 @@ where
 					}
 					keyboard::KeyCode::V => {
 						if state.keyboard_modifiers.command() {
-							let content = match state.is_pasting.take() {
+							let content: String = match state.is_pasting.take()
+							{
 								Some(content) => content,
-								None => {
-									let content: String = clipboard
-										.read()
-										.unwrap_or_default()
-										.chars()
-										.filter(|&c| {
-											!c.is_control()
-												|| c == '\n' || c == '\r' || c
-												== '\t'
-										})
-										.collect();
-
-									Value::new(&content)
-								}
+								None => clipboard
+									.read()
+									.unwrap_or_default()
+									.chars()
+									.filter(|&c| {
+										!c.is_control()
+											|| c == '\n' || c == '\r' || c == '\t'
+									})
+									.collect(),
 							};
 
-							let mut editor =
-								Editor::new(value, &mut state.cursor);
+							let mut editor = Editor::new(
+								&mut state.value,
+								&mut state.cursor,
+							);
 
-							editor.paste(content.clone());
+							editor.paste(&content);
 
 							let message = (on_change)(editor.contents());
 							shell.publish(message);
@@ -664,7 +658,6 @@ where
 
 							state.recalculate_scroll_offset(
 								renderer,
-								value,
 								text_bounds.size(),
 								font.clone(),
 								size,
@@ -677,11 +670,10 @@ where
 					keyboard::KeyCode::A
 						if state.keyboard_modifiers.command() =>
 					{
-						state.cursor.select_all(value);
+						state.cursor.select_all(&state.value);
 
 						state.recalculate_scroll_offset(
 							renderer,
-							value,
 							text_bounds.size(),
 							font.clone(),
 							size,
@@ -697,7 +689,6 @@ where
 
 						state.recalculate_scroll_offset(
 							renderer,
-							value,
 							text_bounds.size(),
 							font.clone(),
 							size,
@@ -749,7 +740,6 @@ pub fn draw<Renderer>(
 	layout: Layout<'_>,
 	pointer_position: Point,
 	state: &State,
-	value: &Value,
 	placeholder: &str,
 	size: Option<u16>,
 	tab_width: u8,
@@ -760,6 +750,7 @@ pub fn draw<Renderer>(
 {
 	let bounds = layout.bounds();
 	let text_bounds = layout.children().next().unwrap().bounds();
+	let value = &state.value;
 
 	let is_mouse_over = bounds.contains(pointer_position);
 
@@ -803,10 +794,10 @@ pub fn draw<Renderer>(
 
 				let (left_point, right_point) = {
 					let left_y =
-						value.count_lines_before(left) as f32 * f32::from(size);
+						value.byte_to_line(left) as f32 * f32::from(size);
 					let right_y = left_y
-						+ value.count_lines_between(left, right) as f32
-							* f32::from(size);
+						+ (value.byte_slice(left..right).len_lines() - 1)
+							as f32 * f32::from(size);
 
 					let left_x = offset_x_of_index(
 						left,
@@ -862,39 +853,56 @@ pub fn draw<Renderer>(
 
 					let mut line_start = left;
 
+					let mut line_index = value.byte_to_line(line_start);
+
 					let mut start_point = left_point;
 
 					loop {
-						let line_end =
-							value.next_end_of_line(line_start).min(right);
+						let line_end = value.line_to_byte(line_index + 1);
 
-						let width = if line_end == line_start {
-							if line_end == right || line_start == left {
-								0.0
-							} else {
-								f32::from(size) / 2.0
-							}
-						} else {
-							width_of_range(
-								line_start,
-								line_end,
-								value,
-								renderer,
-								font.clone(),
-								Some(size),
-								tab_width,
-							)
-						};
+						// let width = if line_end == line_start {
+						// 	if line_end == right || line_start == left {
+						// 		0.0
+						// 	} else {
+						// 		f32::from(size) / 2.0
+						// 	}
+						// } else {
+						// 	width_of_range(
+						// 		line_start,
+						// 		line_end,
+						// 		value,
+						// 		renderer,
+						// 		font.clone(),
+						// 		Some(size),
+						// 		tab_width,
+						// 	)
+						// };
+
+						let mut width = width_of_range(
+							line_start,
+							line_end.min(right),
+							value,
+							renderer,
+							font.clone(),
+							Some(size),
+							tab_width,
+						);
+
+						if value.byte(line_end.min(right) - 1) == b'\n' {
+							width += f32::from(size) / 2.0;
+						}
 
 						selections.push((quad(start_point, width), color));
 
-						line_start = line_end + 1;
+						if line_end >= right {
+							break;
+						}
+
+						line_start = line_end;
 						start_point =
 							Point::new(0.0, start_point.y + f32::from(size));
 
-						if line_end == right {
-							break;
-						}
+						line_index += 1;
 					}
 
 					selections
@@ -950,37 +958,65 @@ pub fn draw<Renderer>(
 		for (selection, color) in selections {
 			renderer.fill_quad(selection, color);
 		}
-		let color = if value.is_empty() {
+		let color = if value.len_bytes() == 0 {
 			style_sheet.placeholder_color()
 		} else {
 			style_sheet.value_color()
 		};
 
-		let text = value.to_string(tab_width);
+		let size = f32::from(size);
 
-		let content: Cow<str> = match text.chars().next_back() {
-			None => placeholder.into(),
-			Some('\n') => {
-				let mut t = text;
-				t.push(' ');
-				t.into()
+		if value.len_bytes() == 0 {
+			renderer.fill_text(Text {
+				content: placeholder,
+				color,
+				font: font.clone(),
+				bounds: Rectangle {
+					width: f32::INFINITY,
+					height: f32::INFINITY,
+					..text_bounds
+				},
+				size,
+				horizontal_alignment: alignment::Horizontal::Left,
+				vertical_alignment: alignment::Vertical::Top,
+			});
+			return;
+		}
+
+		let first_line = (state.scroll.y / size).floor() as usize;
+
+		let line_count = (text_bounds.height / size).ceil() as usize;
+
+		let lines = value.byte_slice(
+			value.line_to_byte(first_line)
+				..=value
+					.line_to_byte(
+						(first_line + line_count).min(value.len_lines()),
+					)
+					.min(value.len_bytes() - 1),
+		);
+
+		let text = lines.display(tab_width);
+
+		for (i, mut line) in text.enumerate() {
+			if i == line_count && line == "" {
+				line = " ".into();
 			}
-			Some(_) => text.into(),
-		};
-
-		renderer.fill_text(Text {
-			content: content.as_ref(),
-			color,
-			font: font.clone(),
-			bounds: Rectangle {
-				width: f32::INFINITY,
-				height: f32::INFINITY,
-				..text_bounds
-			},
-			size: f32::from(size),
-			horizontal_alignment: alignment::Horizontal::Left,
-			vertical_alignment: alignment::Vertical::Top,
-		});
+			renderer.fill_text(Text {
+				content: &line,
+				color,
+				font: font.clone(),
+				bounds: Rectangle {
+					x: text_bounds.x,
+					y: text_bounds.y + (i + first_line) as f32 * size,
+					width: f32::INFINITY,
+					height: size,
+				},
+				size,
+				horizontal_alignment: alignment::Horizontal::Left,
+				vertical_alignment: alignment::Vertical::Top,
+			});
+		}
 	};
 
 	renderer.with_layer(text_bounds, |renderer| {
@@ -1028,7 +1064,7 @@ where
 			limits,
 			self.width,
 			self.height,
-			&self.value,
+			&self.state.value,
 			self.padding,
 			self.size,
 		)
@@ -1050,7 +1086,6 @@ where
 			renderer,
 			clipboard,
 			shell,
-			&mut self.value,
 			self.size,
 			self.tab_width,
 			&self.font,
@@ -1078,7 +1113,7 @@ where
 		cursor_position: Point,
 		_viewport: &Rectangle,
 	) {
-		self.draw(renderer, layout, cursor_position, None)
+		self.draw(renderer, layout, cursor_position)
 	}
 }
 
@@ -1098,9 +1133,10 @@ where
 /// The state of a [`TextInput`].
 #[derive(Debug, Clone)]
 pub struct State {
+	value: Rope,
 	is_focused: bool,
 	is_dragging: bool,
-	is_pasting: Option<Value>,
+	is_pasting: Option<String>,
 	last_click: Option<mouse::Click>,
 	cursor: Cursor,
 	keyboard_modifiers: keyboard::Modifiers,
@@ -1111,6 +1147,7 @@ pub struct State {
 impl Default for State {
 	fn default() -> Self {
 		Self {
+			value: Rope::new(),
 			is_focused: false,
 			is_dragging: false,
 			is_pasting: None,
@@ -1132,6 +1169,10 @@ impl State {
 		}
 	}
 
+	pub fn contents(&self) -> String {
+		self.value.to_string()
+	}
+
 	/// Returns whether the [`TextInput`] is currently focused or not.
 	fn is_focused(&self) -> bool {
 		self.is_focused
@@ -1140,16 +1181,15 @@ impl State {
 	fn recalculate_scroll_offset<Renderer: text::Renderer>(
 		&mut self,
 		renderer: &Renderer,
-		value: &Value,
 		bounds_size: Size<f32>,
 		font: Renderer::Font,
 		size: u16,
 		tab_width: u8,
 	) {
-		let cursor_index = self.cursor.end(value);
+		let cursor_index = self.cursor.end(&self.value);
 		let cursor = offset_of_index(
 			cursor_index,
-			value,
+			&self.value,
 			renderer,
 			font,
 			size,
@@ -1206,7 +1246,6 @@ fn index_at_point<Renderer>(
 	font: Renderer::Font,
 	size: u16,
 	tab_width: u8,
-	value: &Value,
 	state: &State,
 	mut point: Point,
 ) -> Option<usize>
@@ -1217,33 +1256,102 @@ where
 
 	let line_num = (point.y / f32::from(size)).floor() as usize;
 
-	let line_start = match value.nth_line_start(line_num) {
-		Some(i) => i,
-		None => return Some(value.len()),
+	let line_start = match state.value.try_line_to_byte(line_num) {
+		Ok(i) if i < state.value.len_bytes() => i,
+		_ => return Some(state.value.len_bytes()),
 	};
 
-	let line_end = value.next_end_of_line(line_start);
+	let line = state.value.line(line_num);
 
-	let line = value.select(line_start, line_end).to_string(tab_width);
+	let line_text = line
+		.display(tab_width)
+		.next()
+		.expect("No line produced for hit test");
 
-	if line.is_empty() {
+	if line_text.trim().is_empty() {
 		return Some(line_start);
 	}
 
+	hit_byte_index(
+		renderer,
+		line,
+		line_text.as_ref(),
+		size,
+		font,
+		tab_width,
+		point,
+	)
+	.map(|offset| line_start + offset)
+}
+
+fn hit_byte_index<'t, Renderer: text::Renderer>(
+	renderer: &Renderer,
+	line: RopeSlice<'_>,
+	line_text: impl Into<Option<&'t str>>,
+	size: u16,
+	font: Renderer::Font,
+	tab_width: u8,
+	point: Point,
+) -> Option<usize> {
+	let line_text = line_text.into().map_or_else(
+		|| {
+			line.display(tab_width)
+				.next()
+				.expect("No line produced for hit test")
+		},
+		Into::into,
+	);
+
 	renderer
-		.hit_test(&line, size.into(), font, Size::INFINITY, point, true)
+		.hit_test(&line_text, size.into(), font, Size::INFINITY, point, true)
 		.map(text::Hit::cursor)
 		.map(|index| {
-			let num_tabs = value.count_tabs_between(line_start, line_end);
-			let num_virtual_spaces =
-				num_tabs * (tab_width.saturating_sub(1)) as usize;
-			index + line_start - num_virtual_spaces
+			if index == line_text.len() {
+				return line.len_bytes();
+			}
+			let byte_index = line_text
+				.grapheme_indices(true)
+				.nth(index)
+				.expect("Hit test produced out of bounds grapheme index")
+				.0;
+
+			let tab_width = usize::from(tab_width);
+
+			let result = line.bytes().try_fold((0, 0), |(i, num_tabs), b| {
+				if i >= byte_index {
+					let num_virtual_spaces =
+						num_tabs * (tab_width.saturating_sub(1)) as usize;
+
+					ControlFlow::Break(byte_index - num_virtual_spaces)
+				} else if b == b'\t' {
+					if i + tab_width > byte_index {
+						let num_virtual_spaces =
+							num_tabs * (tab_width.saturating_sub(1)) as usize;
+						if (byte_index - i) <= tab_width / 2 {
+							ControlFlow::Break(i - num_virtual_spaces)
+						} else {
+							ControlFlow::Break(i - num_virtual_spaces + 1)
+						}
+					} else {
+						ControlFlow::Continue((i + tab_width, num_tabs + 1))
+					}
+				} else {
+					ControlFlow::Continue((i + 1, num_tabs))
+				}
+			});
+
+			match result {
+				ControlFlow::Continue(_) => {
+					panic!("Hit test produced invalid byte index")
+				}
+				ControlFlow::Break(i) => i,
+			}
 		})
 }
 
 fn offset_x_of_index<Renderer>(
 	index: usize,
-	value: &Value,
+	value: &Rope,
 	renderer: &Renderer,
 	font: Renderer::Font,
 	size: Option<u16>,
@@ -1252,19 +1360,19 @@ fn offset_x_of_index<Renderer>(
 where
 	Renderer: text::Renderer,
 {
-	let line_start = value.previous_start_of_line(index);
+	let line_start = value.line_to_byte(value.byte_to_line(index));
 	width_of_range(line_start, index, value, renderer, font, size, tab_width)
 }
 
-fn offset_y_of_index(index: usize, value: &Value, size: u16) -> f32 {
-	let lines_before = value.count_lines_before(index);
+fn offset_y_of_index(index: usize, value: &Rope, size: u16) -> f32 {
+	let lines_before = value.byte_to_line(index);
 	lines_before as f32 * f32::from(size)
 }
 
 fn width_of_range<Renderer>(
 	start: usize,
 	end: usize,
-	value: &Value,
+	value: &Rope,
 	renderer: &Renderer,
 	font: Renderer::Font,
 	size: Option<u16>,
@@ -1273,17 +1381,22 @@ fn width_of_range<Renderer>(
 where
 	Renderer: text::Renderer,
 {
-	let range = value.select(start, end);
-	renderer.measure_width(
-		&range.to_string(tab_width),
-		size.unwrap_or_else(|| renderer.default_size()),
+	let size = size.unwrap_or_else(|| renderer.default_size());
+
+	let space_width = renderer.measure_width(" ", size, font.clone());
+	width_of_slice(
+		value.byte_slice(start..end),
+		renderer,
 		font,
+		size,
+		tab_width,
+		space_width,
 	)
 }
 
 fn offset_of_index<Renderer>(
 	index: usize,
-	value: &Value,
+	value: &Rope,
 	renderer: &Renderer,
 	font: Renderer::Font,
 	size: u16,
@@ -1299,7 +1412,7 @@ where
 }
 
 fn max_line_length<Renderer>(
-	value: &Value,
+	value: &Rope,
 	renderer: &Renderer,
 	font: Renderer::Font,
 	size: u16,
@@ -1308,12 +1421,232 @@ fn max_line_length<Renderer>(
 where
 	Renderer: text::Renderer,
 {
+	let space_width = renderer.measure_width(" ", size, font.clone());
+
 	value
-		.lines(tab_width)
+		.lines()
 		.map(|s| {
-			NotNan::new(renderer.measure_width(&s, size, font.clone())).unwrap()
+			NotNan::new(width_of_slice(
+				s,
+				renderer,
+				font.clone(),
+				size,
+				tab_width,
+				space_width,
+			))
+			.unwrap()
 		})
 		.max()
 		.map(|x| x.into_inner())
 		.unwrap_or(0.0)
+}
+
+fn width_of_slice<Renderer: text::Renderer>(
+	slice: RopeSlice<'_>,
+	renderer: &Renderer,
+	font: Renderer::Font,
+	size: u16,
+	tab_width: u8,
+	space_width: f32,
+) -> f32 {
+	let mut chunks = slice.chunks();
+
+	let mut width = 0.0;
+
+	let mut s = match chunks.next() {
+		Some(s) => Cow::Borrowed(s),
+		None => return width,
+	};
+
+	loop {
+		let mut i = 0;
+		let mut text_start = 0;
+		let b = s.as_bytes();
+
+		while i < b.len() {
+			if b[i] == b'\t' {
+				let text = &s[text_start..i];
+				if !text.is_empty() {
+					width += renderer.measure_width(text, size, font.clone());
+				}
+
+				let tab_start = i;
+				i += 1;
+
+				while i < b.len() && b[i] == b'\t' {
+					i += 1;
+				}
+
+				width +=
+					space_width * f32::from(tab_width) * (i - tab_start) as f32;
+				text_start = i;
+			} else {
+				i += 1;
+			}
+		}
+
+		s = if text_start == s.len() {
+			match chunks.next() {
+				Some(s) => Cow::Borrowed(s),
+				None => {
+					let text = &s[text_start..i];
+					if !text.is_empty() {
+						width += renderer.measure_width(text, size, font);
+					}
+					return width;
+				}
+			}
+		} else {
+			match chunks.next() {
+				Some(next) => Cow::Owned(s[text_start..].to_owned() + next),
+				None => {
+					let text = &s[text_start..i];
+					if !text.is_empty() {
+						width += renderer.measure_width(text, size, font);
+					}
+					return width;
+				}
+			}
+		};
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use std::iter::repeat;
+
+	use iced_graphics::Font;
+	use iced_native::text::Renderer;
+	use ropey::{Rope, RopeBuilder};
+
+	use super::*;
+
+	struct Mock;
+
+	impl iced_native::Renderer for Mock {
+		fn with_layer(&mut self, _: Rectangle, f: impl FnOnce(&mut Self)) {
+			f(self);
+		}
+
+		fn with_translation(&mut self, _: Vector, f: impl FnOnce(&mut Self)) {
+			f(self)
+		}
+
+		fn clear(&mut self) {}
+
+		fn fill_quad(
+			&mut self,
+			_: renderer::Quad,
+			_: impl Into<iced_graphics::Background>,
+		) {
+		}
+	}
+
+	impl Renderer for Mock {
+		type Font = Font;
+
+		const ICON_FONT: Self::Font = Font::Default;
+
+		const CHECKMARK_ICON: char = '✅';
+
+		const ARROW_DOWN_ICON: char = '⬇';
+
+		fn default_size(&self) -> u16 {
+			12
+		}
+
+		fn measure(
+			&self,
+			content: &str,
+			size: u16,
+			_: Self::Font,
+			bounds: Size,
+		) -> (f32, f32) {
+			(
+				((content.len() * size as usize) as f32).min(bounds.width),
+				f32::from(size).min(bounds.height),
+			)
+		}
+
+		fn hit_test(
+			&self,
+			_: &str,
+			_: f32,
+			_: Font,
+			_: Size,
+			_: Point,
+			_: bool,
+		) -> Option<text::Hit> {
+			unimplemented!()
+		}
+
+		fn fill_text(&mut self, _: Text<'_, Self::Font>) {}
+	}
+
+	#[test]
+	fn mock_text_renderer() {
+		assert_eq!(Mock.measure_width(" ", 10, Font::default()), 10.0);
+		assert_eq!(Mock.measure_width("hello", 10, Font::default()), 50.0);
+	}
+
+	#[test]
+	fn width_of_slice_basic() {
+		let rope = Rope::from_str("hello");
+		assert_eq!(
+			width_of_slice(rope.slice(..), &Mock, Font::default(), 10, 4, 10.0),
+			50.0
+		);
+	}
+
+	#[test]
+	fn width_of_slice_long() {
+		let iters = 10_000;
+		let string = "this is a long string ";
+		let rope = {
+			let mut builder = RopeBuilder::new();
+			for s in repeat(string).take(iters) {
+				builder.append(s)
+			}
+			builder.finish()
+		};
+
+		{
+			let mut chunks = rope.chunks();
+
+			chunks.next();
+
+			assert_ne!(chunks.next(), None);
+		}
+
+		let size = 10;
+		assert_eq!(
+			width_of_slice(
+				rope.slice(..),
+				&Mock,
+				Font::default(),
+				size,
+				4,
+				size.into()
+			),
+			(iters * string.len() * usize::from(size)) as f32
+		);
+	}
+
+	#[test]
+	fn width_of_slice_tabs() {
+		let rope = Rope::from_str("\t\thello\tworld");
+		let size = 10;
+		let tab_width = 4;
+		assert_eq!(
+			width_of_slice(
+				rope.slice(..),
+				&Mock,
+				Font::default(),
+				size,
+				tab_width,
+				size.into()
+			),
+			(3 * u16::from(tab_width) * size + 10 * size) as f32
+		);
+	}
 }

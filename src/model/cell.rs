@@ -28,7 +28,6 @@ use crate::{
 pub(crate) struct Cell {
 	input_state: editor::State,
 	eval_button_state: button::State,
-	pub(crate) contents: String,
 	pub(crate) results: Vec<EvalResult>,
 }
 
@@ -37,7 +36,6 @@ impl Default for Cell {
 		Self {
 			input_state: editor::State::focused(),
 			eval_button_state: button::State::new(),
-			contents: String::new(),
 			results: vec![],
 		}
 	}
@@ -50,12 +48,9 @@ impl Cell {
 		tab_index: TabIndex,
 		index: CellIndex,
 	) -> Element<'s, Message> {
-		let input = TextInput::new(
-			&mut self.input_state,
-			"",
-			&self.contents,
-			move |contents| Message::NewContents(tab_index, index, contents),
-		)
+		let input = TextInput::new(&mut self.input_state, "", move |_| {
+			Message::Nothing
+		})
 		.size(config.text_settings.editor_font_size)
 		.style(Box::new(style::text_input::Editor::from(config))
 			as Box<dyn TextInputStyleSheet + 'static>)
@@ -119,6 +114,10 @@ impl Cell {
 			.push(Space::new(Length::Shrink, Length::Units(10)))
 			.push(eval_button)
 			.into()
+	}
+
+	pub(crate) fn contents(&self) -> String {
+		self.input_state.contents()
 	}
 }
 

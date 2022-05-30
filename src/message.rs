@@ -17,7 +17,6 @@ pub(crate) enum Message {
 	OpenTab(Arc<str>),
 	SwitchTab(TabIndex),
 	CloseTab(TabIndex),
-	NewContents(TabIndex, CellIndex, String),
 	Error(Arc<Error>),
 	Batch(Vec<Message>),
 	Eval(TabIndex, CellIndex),

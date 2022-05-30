@@ -218,14 +218,9 @@ impl Application for State {
 				)
 			}
 
-			Message::NewContents(tab, cell, contents) => {
-				self.tabs[tab].cells[cell].contents = contents;
-				Command::none()
-			}
-
 			Message::Eval(tab_index, cell) => {
 				let tab = &mut self.tabs[tab_index];
-				let code = tab.cells[cell].contents.to_owned();
+				let code = tab.cells[cell].contents();
 				let env = tab.env.clone();
 
 				Command::perform(

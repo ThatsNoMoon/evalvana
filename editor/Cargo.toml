@@ -11,4 +11,5 @@ edition = "2021"
 iced_graphics = { git = "https://github.com/iced-rs/iced" }
 iced_native = { git = "https://github.com/iced-rs/iced" }
 ordered-float = "2.10"
+ropey = "1.4"
 unicode-segmentation = "1.6"
