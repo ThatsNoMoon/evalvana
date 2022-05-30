@@ -8,7 +8,7 @@ use std::{collections::HashMap, fmt, sync::Arc};
 use evalvana_api::EvalResult;
 use iced::{
 	alignment, button, scrollable, Button, Column, Container, Element, Length,
-	Row, Scrollable, Space, Text,
+	Row, Rule, Scrollable, Space, Text,
 };
 use tokio::sync::RwLock;
 
@@ -84,6 +84,7 @@ impl Tab {
 		is_active: bool,
 		index: TabIndex,
 	) -> (Element<'s, Message>, Option<Element<'s, Message>>) {
+		let text_size = config.text_settings.ui_font_size;
 		let tab_button = {
 			let label = Text::new(&*self.plugin_name)
 				.color(if is_active {
@@ -91,14 +92,17 @@ impl Tab {
 				} else {
 					config.ui_colors.unfocused_text
 				})
-				.size(config.text_settings.ui_font_size)
+				.size(text_size)
 				.font(font::BODY);
 
-			let label = Container::new(label).height(Length::Fill).center_y();
+			let label = Container::new(label)
+				.height(Length::Fill)
+				.padding([0, text_size / 2])
+				.center_y();
 
 			let row = Row::with_children(vec![
 				label.into(),
-				Space::with_width(Length::Units(50)).into(),
+				Space::with_width(Length::Units(text_size * 3)).into(),
 			]);
 
 			let button = Button::new(&mut self.tab_button_state, row)
@@ -113,12 +117,14 @@ impl Tab {
 		};
 
 		let close_button = {
-			let icon = Text::new(CLOSE_TAB).font(icons::FONT).size(8);
+			let icon =
+				Text::new(CLOSE_TAB).font(icons::FONT).size(text_size / 2);
 			let icon = Container::new(icon).center_y().height(Length::Fill);
 
 			Button::new(&mut self.close_button_state, icon)
 				.height(Length::Fill)
 				.style(style::button::tab_close(config, is_active))
+				.padding([0, text_size * 3 / 4])
 				.on_press(Message::CloseTab(index))
 		};
 
@@ -224,10 +230,9 @@ impl Tabs {
 
 		let active_tab = self.active_tab;
 		let mut content = None;
+		let last_tab = self.tabs.len() - 1;
 		let handles = self.tabs.iter_mut().enumerate().fold(
-			Row::new()
-				.height(iced::Length::Units(33))
-				.push(Space::with_width(Length::Units(7))),
+			Row::new().height(Length::Fill),
 			|row, (i, tab)| {
 				let i = TabIndex(i);
 				let (handle, contents) = tab.view(config, i == active_tab, i);
@@ -236,13 +241,27 @@ impl Tabs {
 					content = contents;
 				}
 
-				row.push(handle).push(Space::with_width(Length::Units(7)))
+				let row = row.push(handle);
+
+				let divider_width = if i != active_tab
+					&& TabIndex(i.0 + 1) != active_tab
+					&& i.0 != last_tab
+				{
+					1
+				} else {
+					0
+				};
+
+				row.push(
+					Rule::vertical(1)
+						.style(style::rule::tab_divider(config, divider_width)),
+				)
 			},
 		);
 
 		let handles = Container::new(handles)
-			.style(style::container::tab_bg(config))
-			.height(Length::Units(40))
+			.style(style::container::secondary_bg(config))
+			.height(Length::Units(config.text_settings.ui_font_size * 3))
 			.width(Length::Fill)
 			.align_y(alignment::Vertical::Bottom);
 

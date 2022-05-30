@@ -70,8 +70,8 @@ pub(crate) mod button {
 
 	pub(crate) struct StyleSheet {
 		bg: Color,
-		disabled_bg: Color,
 		hovered_bg: Color,
+		disabled_bg: Color,
 		text: Color,
 		hovered_text: Color,
 		disabled_text: Color,
@@ -103,13 +103,21 @@ pub(crate) mod button {
 				..self.active()
 			}
 		}
+
+		fn pressed(&self) -> Style {
+			Style {
+				background: Some(Background::Color(self.hovered_bg)),
+				text_color: self.hovered_text,
+				..self.active()
+			}
+		}
 	}
 
 	pub(crate) fn primary(config: &Config) -> StyleSheet {
 		StyleSheet {
 			bg: config.ui_colors.secondary_bg,
-			disabled_bg: config.ui_colors.unfocused_bg,
 			hovered_bg: config.ui_colors.hovered_bg,
+			disabled_bg: config.ui_colors.unfocused_bg,
 			text: config.ui_colors.text,
 			hovered_text: config.ui_colors.text,
 			disabled_text: config.ui_colors.unfocused_text,
@@ -172,12 +180,6 @@ pub(crate) mod container {
 		}
 	}
 
-	pub(crate) fn tab_bg(config: &Config) -> StyleSheet {
-		StyleSheet {
-			bg: config.ui_colors.borders,
-		}
-	}
-
 	pub(crate) fn ui_bg(config: &Config) -> StyleSheet {
 		StyleSheet {
 			bg: config.ui_colors.bg,
@@ -199,7 +201,7 @@ pub(crate) mod container {
 
 pub(crate) mod rule {
 	use iced::{
-		rule::{Style, StyleSheet as RuleStyleSheet},
+		rule::{FillMode, Style, StyleSheet as RuleStyleSheet},
 		Color,
 	};
 
@@ -208,6 +210,7 @@ pub(crate) mod rule {
 	pub(crate) struct StyleSheet {
 		color: Color,
 		width: u16,
+		fill_mode: FillMode,
 	}
 
 	impl RuleStyleSheet for StyleSheet {
@@ -215,6 +218,7 @@ pub(crate) mod rule {
 			Style {
 				color: self.color,
 				width: self.width,
+				fill_mode: self.fill_mode,
 				..Style::default()
 			}
 		}
@@ -224,6 +228,15 @@ pub(crate) mod rule {
 		StyleSheet {
 			color: config.ui_colors.borders,
 			width,
+			fill_mode: FillMode::Full,
+		}
+	}
+
+	pub(crate) fn tab_divider(config: &Config, width: u16) -> StyleSheet {
+		StyleSheet {
+			color: config.ui_colors.borders,
+			width,
+			fill_mode: FillMode::Percent(75.0),
 		}
 	}
 }
