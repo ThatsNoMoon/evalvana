@@ -118,14 +118,6 @@ impl Application for State {
 							));
 						}
 
-						#[cfg(windows)]
-						match plugin.program.extension() {
-							None => {
-								plugin.program.set_extension("exe");
-							}
-							Some(_) => (),
-						}
-
 						plugin.program = which::which_in(
 							&plugin.program,
 							env::var_os("PATH"),
