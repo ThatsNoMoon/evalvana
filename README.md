@@ -2,7 +2,7 @@
 
 Evalvana is an extremely WIP REPL environment for any language with a plugin.
 
-![Evalvana interface demo](https://github.com/ThatsNoMoon/evalvana/blob/stable/assets/misc/demo_screenshot.png?raw=true)
+![Evalvana interface demo](https://github.com/ThatsNoMoon/evalvana/blob/a35454baa8d803e24643358a820cce3e5d85199a/assets/misc/demo_screenshot.png?raw=true)
 
 ## Intended direction
 
