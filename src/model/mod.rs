@@ -187,7 +187,9 @@ impl Tabs {
 
 	pub(crate) fn remove(&mut self, index: TabIndex) -> Tab {
 		let tab = self.tabs.remove(index.0);
-		self.active_tab.0 = self.active_tab.0.saturating_sub(1);
+		if index <= self.active_tab {
+			self.active_tab.0 = self.active_tab.0.saturating_sub(1);
+		}
 		tab
 	}
 
