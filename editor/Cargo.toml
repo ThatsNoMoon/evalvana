@@ -8,8 +8,8 @@ license = "MIT"
 edition = "2021"
 
 [dependencies]
-iced_graphics = { git = "https://github.com/iced-rs/iced" }
-iced_native = { git = "https://github.com/iced-rs/iced" }
-ordered-float = "2.10"
+iced_graphics = "0.3"
+iced_native = "0.5"
+ordered-float = "3.0"
 ropey = "1.4"
 unicode-segmentation = "1.6"
