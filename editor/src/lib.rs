@@ -860,24 +860,6 @@ pub fn draw<Renderer>(
 					loop {
 						let line_end = value.line_to_byte(line_index + 1);
 
-						// let width = if line_end == line_start {
-						// 	if line_end == right || line_start == left {
-						// 		0.0
-						// 	} else {
-						// 		f32::from(size) / 2.0
-						// 	}
-						// } else {
-						// 	width_of_range(
-						// 		line_start,
-						// 		line_end,
-						// 		value,
-						// 		renderer,
-						// 		font.clone(),
-						// 		Some(size),
-						// 		tab_width,
-						// 	)
-						// };
-
 						let mut width = width_of_range(
 							line_start,
 							line_end.min(right),
