@@ -15,8 +15,10 @@ The benefits Evalvana wants to bring to developers include:
 
 ## License
 
-Evalvana is licensed under the [OSL 3.0](https://choosealicense.com/licenses/osl-3.0/). Derivatives must be licensed under OSL 3.0, but this does not include any linking restrictions; you may link this code to closed-source code.
+Evalvana is licensed under the [AGPL v3.0](https://choosealicense.com/licenses/agpl-3.0/).
 
-Plugins included in this source tree (those under the plugins directory, not including the api) are licensed under the [BSD Zero Clause License](https://choosealicense.com/licenses/0bsd/); in summary, you may use that code with no restriction or warranty. Feel free to copy them to start your own plugin under any other license.
+Plugins included in this source tree (those under the plugins directory, not including the API) are licensed under the [BSD Zero Clause License](https://choosealicense.com/licenses/0bsd/); in summary, you may use that code with no restriction or warranty. Feel free to copy them to start your own plugin under any other license.
+
+The plugin API (plugins/api) is licensed under [OSL 3.0](https://choosealicense.com/licenses/osl-3.0/). Derivatives must be licensed under OSL 3.0, but other projects linking to the API can use any license.
 
 The editor widget (in the editor directory) is derived from the `iced_native` `TextInput` widget and licensed under the [MIT](https://choosealicense.com/licenses/mit/) license.

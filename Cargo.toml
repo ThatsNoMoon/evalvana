@@ -5,7 +5,7 @@ authors = ["ThatsNoMoon <git@thatsnomoon.dev>"]
 repository = "https://github.com/ThatsNoMoon/evalvana"
 description = "An early WIP REPL environment for any language with a plugin."
 readme = "README.md"
-license = "OSL-3.0"
+license = "AGPL-3.0-only"
 edition = "2021"
 
 [dependencies]
