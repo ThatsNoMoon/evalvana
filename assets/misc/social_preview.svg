@@ -1,14 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg
-   xmlns:dc="http://purl.org/dc/elements/1.1/"
-   xmlns:cc="http://creativecommons.org/ns#"
-   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-   xmlns:svg="http://www.w3.org/2000/svg"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:xlink="http://www.w3.org/1999/xlink"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   inkscape:version="1.0 (4035a4fb49, 2020-05-01)"
+   inkscape:version="1.2.1 (9c6d41e410, 2022-07-14)"
    id="svg8"
    version="1.1"
    viewBox="0 0 338.66666 169.33334"
@@ -17,16 +9,24 @@
    sodipodi:docname="social_preview.svg"
    inkscape:export-filename="D:\Development\evalvana\assets\misc\social_preview.png"
    inkscape:export-xdpi="96.000008"
-   inkscape:export-ydpi="96.000008">
+   inkscape:export-ydpi="96.000008"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/">
   <defs
      id="defs2">
     <filter
        inkscape:collect="always"
        style="color-interpolation-filters:sRGB"
        id="filter5489"
-       x="-0.081220966"
+       x="-0.081220962"
        width="1.1624419"
-       y="-0.35218421"
+       y="-0.35218419"
        height="1.7043684">
       <feGaussianBlur
          inkscape:collect="always"
@@ -37,10 +37,10 @@
        inkscape:collect="always"
        style="color-interpolation-filters:sRGB"
        id="filter5501"
-       x="-0.081221042"
+       x="-0.081221038"
        width="1.1624421"
-       y="-0.35218278"
-       height="1.7043656">
+       y="-0.35218277"
+       height="1.7043655">
       <feGaussianBlur
          inkscape:collect="always"
          stdDeviation="2.7235604"
@@ -65,8 +65,8 @@
        id="filter5704"
        x="-0.12896997"
        width="1.2579399"
-       y="-0.13517583"
-       height="1.2703517">
+       y="-0.13517582"
+       height="1.2703516">
       <feGaussianBlur
          inkscape:collect="always"
          stdDeviation="3.0927561"
@@ -96,9 +96,9 @@
        inkscape:collect="always"
        style="color-interpolation-filters:sRGB"
        id="filter5107"
-       x="-0.06039818"
+       x="-0.060398181"
        width="1.1207964"
-       y="-0.059607036"
+       y="-0.059607037"
        height="1.1192141">
       <feGaussianBlur
          inkscape:collect="always"
@@ -119,8 +119,8 @@
      inkscape:document-rotation="0"
      inkscape:current-layer="layer1"
      inkscape:document-units="mm"
-     inkscape:cy="325.10417"
-     inkscape:cx="751.56671"
+     inkscape:cy="325"
+     inkscape:cx="823.5"
      inkscape:zoom="1"
      inkscape:pageshadow="2"
      inkscape:pageopacity="0"
@@ -133,15 +133,20 @@
      inkscape:window-height="1377"
      inkscape:window-x="-8"
      inkscape:window-y="-8"
-     inkscape:window-maximized="1">
+     inkscape:window-maximized="1"
+     inkscape:showpageshadow="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#333333">
     <sodipodi:guide
        id="guide994"
        orientation="0,-1"
-       position="0,84.666673" />
+       position="0,84.666673"
+       inkscape:locked="false" />
     <sodipodi:guide
        position="50.977473,42.334035"
        orientation="0,-1"
-       id="guide873" />
+       id="guide873"
+       inkscape:locked="false" />
   </sodipodi:namedview>
   <metadata
      id="metadata5">
@@ -245,18 +250,18 @@
        id="text872"
        y="142.53484"
        x="131.23334"
-       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:11.1125px;line-height:1.25;font-family:Roboto;-inkscape-font-specification:Roboto;letter-spacing:0px;word-spacing:0px;white-space:pre;inline-size:149.827;fill:#f1f1f1;fill-opacity:1;stroke-width:0.264583"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:11.1125px;line-height:1.25;font-family:Roboto;-inkscape-font-specification:Roboto;letter-spacing:0px;word-spacing:0px;white-space:pre;inline-size:151.414;fill:#f1f1f1;fill-opacity:1;stroke-width:0.264583"
        xml:space="preserve"><tspan
          x="131.23334"
-         y="142.53484"><tspan
-           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:11.1125px;font-family:Roboto;-inkscape-font-specification:Roboto;fill:#f1f1f1;fill-opacity:1;stroke-width:0.264583">Bringing the REPL to everone, </tspan></tspan><tspan
+         y="142.53484"
+         id="tspan1757">Bringing the REPL to everyone, </tspan><tspan
          x="131.23334"
-         y="156.42546"><tspan
-           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:11.1125px;font-family:Roboto;-inkscape-font-specification:Roboto;fill:#f1f1f1;fill-opacity:1;stroke-width:0.264583">for every language,
-</tspan></tspan><tspan
+         y="156.42546"
+         id="tspan1759">for every language,
+</tspan><tspan
          x="131.23334"
-         y="170.31609"><tspan
-           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:11.1125px;font-family:Roboto;-inkscape-font-specification:Roboto;fill:#f1f1f1;fill-opacity:1;stroke-width:0.264583">all in one place.</tspan></tspan></text>
+         y="170.31609"
+         id="tspan1761">all in one place.</tspan></text>
   </g>
   <g
      sodipodi:insensitive="true"
